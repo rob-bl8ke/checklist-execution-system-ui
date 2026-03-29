@@ -10,7 +10,19 @@ export const routes: Routes = [
   {
     path: 'runs',
     loadComponent: () =>
-      import('./pages/runs/runs.component').then((m) => m.RunsComponent),
+      import('./pages/runs/run-list/run-list.component').then((m) => m.RunListComponent),
+  },
+  {
+    path: 'runs/new',
+    loadComponent: () =>
+      import('./pages/runs/start-run/start-run.component').then((m) => m.StartRunComponent),
+  },
+  {
+    path: 'runs/:id',
+    loadComponent: () =>
+      import('./pages/runs/run-execution/run-execution.component').then(
+        (m) => m.RunExecutionComponent,
+      ),
   },
   {
     path: 'templates',
