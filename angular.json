@@ -16,7 +16,7 @@
         "build": {
           "builder": "@angular-devkit/build-angular:application",
           "options": {
-            "outputPath": "dist/ui-temp",
+            "outputPath": "dist/checklist-execution-system-ui",
             "index": "src/index.html",
             "browser": "src/main.ts",
             "polyfills": [
@@ -69,10 +69,10 @@
           "builder": "@angular-devkit/build-angular:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "ui-temp:build:production"
+              "buildTarget": "checklist-execution-system-ui:build:production"
             },
             "development": {
-              "buildTarget": "ui-temp:build:development"
+              "buildTarget": "checklist-execution-system-ui:build:development"
             }
           },
           "defaultConfiguration": "development"
