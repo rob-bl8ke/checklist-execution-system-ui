@@ -48,7 +48,7 @@ export const routes: Routes = [
   {
     path: 'todos',
     loadComponent: () =>
-      import('./pages/todos/todos.component').then((m) => m.TodosComponent),
+      import('./pages/todos/todo-list/todo-list.component').then((m) => m.TodoListComponent),
   },
   { path: '**', redirectTo: 'today' },
 ];
