@@ -2,6 +2,8 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  ElementRef,
+  HostListener,
   inject,
   OnInit,
   signal,
@@ -80,7 +82,7 @@ import { LoadingSpinnerComponent } from '../../../components/loading-spinner/loa
 
         <div class="bg-white rounded-xl shadow-sm overflow-hidden divide-y divide-gray-200">
           @for (step of instance()!.steps; track step.id) {
-            <div [class.opacity-60]="step.completed && expandedStepId() !== step.id">
+            <div [attr.data-step-id]="step.id" [class.opacity-60]="step.completed && expandedStepId() !== step.id">
               <!-- Step header row -->
               <div class="flex items-center gap-3 px-5 py-3">
                 <!-- Completion toggle -->
@@ -139,6 +141,7 @@ export class RunExecutionComponent implements OnInit {
   private readonly api = inject(InstancesApiService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly elementRef = inject(ElementRef);
 
   readonly instance = signal<Instance | null>(null);
   readonly loading = signal(true);
@@ -257,5 +260,61 @@ export class RunExecutionComponent implements OnInit {
 
   goBack(): void {
     this.router.navigate(['/runs']);
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  onKeydown(event: KeyboardEvent): void {
+    const tag = (document.activeElement as HTMLElement)?.tagName?.toLowerCase() ?? '';
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+    const inst = this.instance();
+    if (!inst) return;
+
+    const steps = inst.steps;
+    const currentId = this.expandedStepId();
+    const currentIndex = steps.findIndex((s) => s.id === currentId);
+    const key = event.key.toLowerCase();
+
+    switch (key) {
+      case ' ':
+        event.preventDefault();
+        if (currentIndex !== -1) this.toggleComplete(steps[currentIndex]);
+        break;
+      case 'n': {
+        event.preventDefault();
+        const nextIndex = currentIndex === -1 ? 0 : currentIndex + 1;
+        if (nextIndex < steps.length) {
+          this.expandedStepId.set(steps[nextIndex].id);
+          this.scrollToStep(steps[nextIndex].id);
+        }
+        break;
+      }
+      case 'p':
+        event.preventDefault();
+        if (currentIndex > 0) {
+          this.expandedStepId.set(steps[currentIndex - 1].id);
+          this.scrollToStep(steps[currentIndex - 1].id);
+        }
+        break;
+      case 'c':
+        event.preventDefault();
+        this.copyCurrentStepCode();
+        break;
+    }
+  }
+
+  scrollToStep(stepId: number): void {
+    const el = this.elementRef.nativeElement.querySelector(`[data-step-id="${stepId}"]`) as HTMLElement | null;
+    el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  copyCurrentStepCode(): void {
+    const currentId = this.expandedStepId();
+    if (currentId === null) return;
+    const container = this.elementRef.nativeElement.querySelector(`[data-step-id="${currentId}"]`) as HTMLElement | null;
+    const codeEl = container?.querySelector('pre code') as HTMLElement | null;
+    if (codeEl) {
+      navigator.clipboard.writeText(codeEl.innerText);
+    }
   }
 }

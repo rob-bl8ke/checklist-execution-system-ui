@@ -223,4 +223,124 @@ describe('RunExecutionComponent', () => {
       expect(clipboardSpy).toHaveBeenCalledWith('echo hello');
     });
   });
+
+  describe('keyboard shortcuts (11.1)', () => {
+    function dispatch(key: string): void {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+      fixture.detectChanges();
+    }
+
+    beforeEach(() => {
+      component.expandedStepId.set(STEP_1.id);
+      fixture.detectChanges();
+    });
+
+    it('SPACE should call toggleComplete on the currently expanded step', () => {
+      api.completeStep.and.returnValue(of({ ...STEP_1, completed: true }));
+      dispatch(' ');
+      expect(api.completeStep).toHaveBeenCalledWith(10, STEP_1.id, { completed: true });
+    });
+
+    it('N should expand the next step', () => {
+      dispatch('n');
+      expect(component.expandedStepId()).toBe(STEP_2.id);
+    });
+
+    it('N (uppercase) should expand the next step', () => {
+      dispatch('N');
+      expect(component.expandedStepId()).toBe(STEP_2.id);
+    });
+
+    it('N should not advance past the last step', () => {
+      component.expandedStepId.set(STEP_3.id);
+      dispatch('n');
+      expect(component.expandedStepId()).toBe(STEP_3.id);
+    });
+
+    it('P should expand the previous step', () => {
+      component.expandedStepId.set(STEP_2.id);
+      dispatch('p');
+      expect(component.expandedStepId()).toBe(STEP_1.id);
+    });
+
+    it('P (uppercase) should expand the previous step', () => {
+      component.expandedStepId.set(STEP_2.id);
+      dispatch('P');
+      expect(component.expandedStepId()).toBe(STEP_1.id);
+    });
+
+    it('P should not go before the first step', () => {
+      dispatch('p');
+      expect(component.expandedStepId()).toBe(STEP_1.id);
+    });
+
+    it('C should copy first code block text to clipboard', () => {
+      const clipboardSpy = jasmine.createSpy('writeText').and.returnValue(Promise.resolve());
+      spyOnProperty(navigator, 'clipboard', 'get').and.returnValue(
+        { writeText: clipboardSpy } as unknown as Clipboard,
+      );
+
+      const stepContainer = (fixture.nativeElement as HTMLElement).querySelector('[data-step-id="1"]') as HTMLElement;
+      const pre = document.createElement('pre');
+      const code = document.createElement('code') as HTMLElement;
+      code.innerText = 'kubectl apply -f deploy.yaml';
+      pre.appendChild(code);
+      stepContainer.appendChild(pre);
+
+      dispatch('c');
+      expect(clipboardSpy).toHaveBeenCalledWith('kubectl apply -f deploy.yaml');
+    });
+
+    it('C (uppercase) should copy first code block text to clipboard', () => {
+      const clipboardSpy = jasmine.createSpy('writeText').and.returnValue(Promise.resolve());
+      spyOnProperty(navigator, 'clipboard', 'get').and.returnValue(
+        { writeText: clipboardSpy } as unknown as Clipboard,
+      );
+
+      const stepContainer = (fixture.nativeElement as HTMLElement).querySelector('[data-step-id="1"]') as HTMLElement;
+      const pre = document.createElement('pre');
+      const code = document.createElement('code') as HTMLElement;
+      code.innerText = 'docker build .';
+      pre.appendChild(code);
+      stepContainer.appendChild(pre);
+
+      dispatch('C');
+      expect(clipboardSpy).toHaveBeenCalledWith('docker build .');
+    });
+
+    it('C should do nothing when no code block is present', () => {
+      const clipboardSpy = jasmine.createSpy('writeText').and.returnValue(Promise.resolve());
+      spyOnProperty(navigator, 'clipboard', 'get').and.returnValue(
+        { writeText: clipboardSpy } as unknown as Clipboard,
+      );
+      dispatch('c');
+      expect(clipboardSpy).not.toHaveBeenCalled();
+    });
+
+    it('shortcuts should not fire when an input is focused', () => {
+      api.completeStep.and.returnValue(of({ ...STEP_1, completed: true }));
+      const input = document.createElement('input');
+      document.body.appendChild(input);
+      input.focus();
+      dispatch(' ');
+      expect(api.completeStep).not.toHaveBeenCalled();
+      input.remove();
+    });
+
+    it('shortcuts should not fire when a textarea is focused', () => {
+      api.completeStep.and.returnValue(of({ ...STEP_1, completed: true }));
+      const textarea = document.createElement('textarea');
+      document.body.appendChild(textarea);
+      textarea.focus();
+      dispatch(' ');
+      expect(api.completeStep).not.toHaveBeenCalled();
+      textarea.remove();
+    });
+
+    it('N should expand first step when no step is currently expanded', () => {
+      component.expandedStepId.set(null);
+      dispatch('n');
+      expect(component.expandedStepId()).toBe(STEP_1.id);
+    });
+  });
 });
