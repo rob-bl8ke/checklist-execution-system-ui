@@ -32,13 +32,6 @@ export const routes: Routes = [
       ),
   },
   {
-    path: 'templates/new',
-    loadComponent: () =>
-      import('./pages/templates/template-editor/template-editor.component').then(
-        (m) => m.TemplateEditorComponent,
-      ),
-  },
-  {
     path: 'templates/:id',
     loadComponent: () =>
       import('./pages/templates/template-editor/template-editor.component').then(
