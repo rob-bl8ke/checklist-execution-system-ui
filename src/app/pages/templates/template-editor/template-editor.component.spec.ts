@@ -10,6 +10,8 @@ const MOCK_TEMPLATE: Template = {
   id: 7,
   name: 'My Template',
   description: 'A description',
+  variablePrefix: null,
+  variableSuffix: null,
   createdAt: '',
   updatedAt: null,
 };
@@ -68,6 +70,15 @@ describe('TemplateEditorComponent — edit mode', () => {
     expect(component.description).toBe('A description');
   });
 
+  it('should populate variablePrefix/variableSuffix from template (null → empty string)', () => {
+    expect(component.variablePrefix).toBe('');
+    expect(component.variableSuffix).toBe('');
+  });
+
+  it('should not expand delimiter section when template has no custom delimiters', () => {
+    expect(component.showDelimiters()).toBeFalse();
+  });
+
   it('should load steps after template loads', () => {
     expect(api.getSteps).toHaveBeenCalledWith(7);
     expect(component.steps()).toEqual(MOCK_STEPS);
@@ -78,6 +89,28 @@ describe('TemplateEditorComponent — edit mode', () => {
     component.name = 'Updated';
     component.saveTemplate();
     expect(api.updateTemplate).toHaveBeenCalledWith(7, jasmine.objectContaining({ name: 'Updated' }));
+  });
+
+  it('should include delimiter fields when both are non-empty on save', () => {
+    api.updateTemplate.and.returnValue(of(MOCK_TEMPLATE));
+    component.name = 'Test';
+    component.variablePrefix = '@{';
+    component.variableSuffix = '}';
+    component.saveTemplate();
+    expect(api.updateTemplate).toHaveBeenCalledWith(7, jasmine.objectContaining({
+      variablePrefix: '@{',
+      variableSuffix: '}',
+    }));
+  });
+
+  it('should omit delimiter fields from DTO when only prefix is set', () => {
+    api.updateTemplate.and.returnValue(of(MOCK_TEMPLATE));
+    component.name = 'Test';
+    component.variablePrefix = '@{';
+    component.variableSuffix = '';
+    component.saveTemplate();
+    const dto = (api.updateTemplate.calls.mostRecent().args as unknown[])[1] as Record<string, unknown>;
+    expect(dto['variablePrefix']).toBeUndefined();
   });
 
   it('should set saveError if updateTemplate fails', () => {
@@ -174,5 +207,51 @@ describe('TemplateEditorComponent — create mode', () => {
     component.name = '';
     component.saveTemplate();
     expect(api.createTemplate).not.toHaveBeenCalled();
+  });
+});
+
+describe('TemplateEditorComponent — template with custom delimiters', () => {
+  let fixture: ComponentFixture<TemplateEditorComponent>;
+  let component: TemplateEditorComponent;
+  let api: jasmine.SpyObj<TemplatesApiService>;
+
+  const CUSTOM_TEMPLATE: Template = {
+    id: 9,
+    name: 'Custom Delim',
+    description: null,
+    variablePrefix: '@{',
+    variableSuffix: '}',
+    createdAt: '',
+    updatedAt: null,
+  };
+
+  beforeEach(async () => {
+    api = jasmine.createSpyObj('TemplatesApiService', [
+      'getTemplate', 'getSteps', 'createTemplate', 'updateTemplate', 'moveStep',
+    ]);
+    api.getTemplate.and.returnValue(of(CUSTOM_TEMPLATE));
+    api.getSteps.and.returnValue(of([]));
+
+    await TestBed.configureTestingModule({
+      imports: [TemplateEditorComponent],
+      providers: [
+        { provide: TemplatesApiService, useValue: api },
+        { provide: Router, useValue: jasmine.createSpyObj('Router', ['navigate']) },
+        { provide: ActivatedRoute, useValue: makeRoute('9') },
+      ],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(TemplateEditorComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  it('should populate variablePrefix and variableSuffix from template', () => {
+    expect(component.variablePrefix).toBe('@{');
+    expect(component.variableSuffix).toBe('}');
+  });
+
+  it('should auto-expand delimiter section when template has custom delimiters', () => {
+    expect(component.showDelimiters()).toBeTrue();
   });
 });

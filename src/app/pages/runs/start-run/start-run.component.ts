@@ -11,11 +11,22 @@ import { TemplatesApiService } from '../../../services/templates-api.service';
 import { InstancesApiService } from '../../../services/instances-api.service';
 import { Template } from '../../../models/api.models';
 import { LoadingSpinnerComponent } from '../../../components/loading-spinner/loading-spinner.component';
+import { escapeRegex } from '../../../shared/escape-regex';
 
-/** Extract unique `{{variable}}` placeholder names from a block of text. */
-export function extractVariables(text: string): string[] {
-  const matches = [...text.matchAll(/{{\s*([\w]+)\s*}}/g)];
-  return [...new Set(matches.map((m) => m[1]))];
+/**
+ * Extract unique variable placeholder names from a block of text.
+ *
+ * @param text   The text to scan.
+ * @param prefix Opening delimiter (default `{{`)
+ * @param suffix Closing delimiter (default `}}`)
+ *
+ * Supports pipe transforms — `{{title | upper}}` extracts `title`.
+ */
+export function extractVariables(text: string, prefix = '{{', suffix = '}}'): string[] {
+  const pattern = new RegExp(escapeRegex(prefix) + '\\s*([^}]+?)\\s*' + escapeRegex(suffix), 'g');
+  const matches = [...text.matchAll(pattern)];
+  const names = matches.map((m) => m[1].split('|')[0].trim()).filter(Boolean);
+  return [...new Set(names)];
 }
 
 @Component({
@@ -150,8 +161,10 @@ export class StartRunComponent implements OnInit {
     this.selectedTemplate.set(tmpl);
     this.templatesApi.getSteps(tmpl.id).subscribe({
       next: (steps) => {
+        const prefix = tmpl.variablePrefix ?? '{{';
+        const suffix = tmpl.variableSuffix ?? '}}';
         const allInstructions = steps.map((s) => s.instructions ?? '').join('\n');
-        const vars = extractVariables(allInstructions);
+        const vars = extractVariables(allInstructions, prefix, suffix);
         this.variableNames.set(vars);
         const controls: Record<string, FormControl<string>> = {
           __name: new FormControl('', {

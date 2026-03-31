@@ -7,8 +7,8 @@ import { TemplatesApiService } from '../../../services/templates-api.service';
 import { Template } from '../../../models/api.models';
 
 const MOCK: Template[] = [
-  { id: 1, name: 'Alpha', description: null, createdAt: '', updatedAt: null, stepCount: 2 },
-  { id: 2, name: 'Beta',  description: null, createdAt: '', updatedAt: null, stepCount: 0 },
+  { id: 1, name: 'Alpha', description: null, variablePrefix: null, variableSuffix: null, createdAt: '', updatedAt: null, stepCount: 2 },
+  { id: 2, name: 'Beta',  description: null, variablePrefix: null, variableSuffix: null, createdAt: '', updatedAt: null, stepCount: 0 },
 ];
 
 describe('TemplateListComponent', () => {

@@ -66,6 +66,50 @@ import { StepEditorComponent } from '../step-editor/step-editor.component';
                 placeholder="Optional description…"
               ></textarea>
             </div>
+
+            <!-- Variable Delimiters (collapsible) -->
+            <div>
+              <button
+                type="button"
+                class="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                (click)="showDelimiters.set(!showDelimiters())"
+              >
+                {{ showDelimiters() ? '▾' : '▸' }} Variable Delimiters
+              </button>
+
+              @if (showDelimiters()) {
+                <div class="mt-3 flex flex-col gap-3 pl-4 border-l-2 border-gray-200">
+                  <p class="text-xs text-gray-400">
+                    Customize the opening and closing delimiters for template variables.
+                    Leave blank to use the defaults <code>&#123;&#123;</code> and <code>&#125;&#125;</code>.
+                  </p>
+                  <div class="flex gap-3">
+                    <div class="flex-1">
+                      <label class="block text-xs font-medium text-gray-600 mb-1" for="tmpl-prefix">Prefix</label>
+                      <input
+                        id="tmpl-prefix"
+                        type="text"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        [(ngModel)]="variablePrefix"
+                        placeholder="{{"
+                        maxlength="10"
+                      />
+                    </div>
+                    <div class="flex-1">
+                      <label class="block text-xs font-medium text-gray-600 mb-1" for="tmpl-suffix">Suffix</label>
+                      <input
+                        id="tmpl-suffix"
+                        type="text"
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        [(ngModel)]="variableSuffix"
+                        placeholder="}}"
+                        maxlength="10"
+                      />
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
           </div>
 
           <div class="flex items-center justify-end gap-3 mt-4">
@@ -158,6 +202,9 @@ export class TemplateEditorComponent implements OnInit {
 
   name = '';
   description = '';
+  variablePrefix = '';
+  variableSuffix = '';
+  readonly showDelimiters = signal(false);
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
@@ -175,6 +222,9 @@ export class TemplateEditorComponent implements OnInit {
       next: (template: Template) => {
         this.name = template.name;
         this.description = template.description ?? '';
+        this.variablePrefix = template.variablePrefix ?? '';
+        this.variableSuffix = template.variableSuffix ?? '';
+        if (this.variablePrefix || this.variableSuffix) this.showDelimiters.set(true);
         this.loading.set(false);
         this.loadSteps(id);
       },
@@ -194,7 +244,13 @@ export class TemplateEditorComponent implements OnInit {
     if (!this.name.trim()) return;
     this.saving.set(true);
     this.saveError.set(null);
-    const dto = { name: this.name.trim(), description: this.description.trim() || undefined };
+    const prefix = this.variablePrefix.trim();
+    const suffix = this.variableSuffix.trim();
+    const dto = {
+      name: this.name.trim(),
+      description: this.description.trim() || undefined,
+      ...(prefix && suffix ? { variablePrefix: prefix, variableSuffix: suffix } : {}),
+    };
 
     const call$ = this.isNew()
       ? this.api.createTemplate(dto)

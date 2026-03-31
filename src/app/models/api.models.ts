@@ -6,6 +6,8 @@ export interface Template {
   id: number;
   name: string;
   description: string | null;
+  variablePrefix: string | null;
+  variableSuffix: string | null;
   createdAt: string;
   updatedAt: string | null;
   stepCount?: number;
@@ -23,11 +25,15 @@ export interface TemplateStep {
 export interface CreateTemplateDto {
   name: string;
   description?: string;
+  variablePrefix?: string;
+  variableSuffix?: string;
 }
 
 export interface UpdateTemplateDto {
   name?: string;
   description?: string;
+  variablePrefix?: string;
+  variableSuffix?: string;
 }
 
 export interface CreateStepDto {

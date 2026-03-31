@@ -8,8 +8,8 @@ import { InstancesApiService } from '../../../services/instances-api.service';
 import { Template, TemplateStep, Instance } from '../../../models/api.models';
 
 const MOCK_TEMPLATES: Template[] = [
-  { id: 1, name: 'Deploy', description: null, createdAt: '', updatedAt: null },
-  { id: 2, name: 'Rollback', description: null, createdAt: '', updatedAt: null },
+  { id: 1, name: 'Deploy', description: null, variablePrefix: null, variableSuffix: null, createdAt: '', updatedAt: null },
+  { id: 2, name: 'Rollback', description: null, variablePrefix: null, variableSuffix: null, createdAt: '', updatedAt: null },
 ];
 
 const MOCK_STEPS: TemplateStep[] = [
@@ -48,6 +48,34 @@ describe('extractVariables', () => {
 
   it('should handle whitespace inside braces', () => {
     expect(extractVariables('{{ service }}')).toEqual(['service']);
+  });
+
+  it('should strip pipe expression and return the variable name only', () => {
+    expect(extractVariables('{{title | upper}}')).toEqual(['title']);
+  });
+
+  it('should strip chained pipes and return the variable name only', () => {
+    expect(extractVariables('{{value | trim | lower}}')).toEqual(['value']);
+  });
+
+  it('should strip parameterized pipes', () => {
+    expect(extractVariables('{{text | truncate:50}}')).toEqual(['text']);
+  });
+
+  it('should deduplicate the same variable used with and without a pipe', () => {
+    expect(extractVariables('{{name}} and {{name | upper}}')).toEqual(['name']);
+  });
+
+  it('should extract variables with custom prefix and suffix', () => {
+    expect(extractVariables('Deploy @{serviceName} version @{version}', '@{', '}')).toEqual(['serviceName', 'version']);
+  });
+
+  it('should return empty array when using custom delimiters with no matches', () => {
+    expect(extractVariables('Deploy {{serviceName}}', '@{', '}')).toEqual([]);
+  });
+
+  it('should strip pipes with custom delimiters', () => {
+    expect(extractVariables('@{title | upper}', '@{', '}')).toEqual(['title']);
   });
 });
 
@@ -164,6 +192,41 @@ describe('StartRunComponent', () => {
       component.selectTemplate(MOCK_TEMPLATES[0]);
       expect(component.variableNames()).toEqual([]);
       expect(component.form.contains('__name')).toBeTrue();
+    });
+  });
+
+  describe('template with custom delimiters', () => {
+    const CUSTOM_TEMPLATE: Template = {
+      id: 3, name: 'Custom', description: null,
+      variablePrefix: '@{', variableSuffix: '}',
+      createdAt: '', updatedAt: null,
+    };
+    const CUSTOM_STEPS: TemplateStep[] = [
+      { id: 10, templateId: 3, position: 1, title: 'Step X', instructions: 'Deploy @{serviceName} at @{version}', createdAt: '' },
+    ];
+
+    beforeEach(() => {
+      templatesApi.getSteps.and.returnValue(of(CUSTOM_STEPS));
+      component.selectTemplate(CUSTOM_TEMPLATE);
+    });
+
+    it('should extract variables using custom delimiters', () => {
+      expect(component.variableNames()).toEqual(['serviceName', 'version']);
+    });
+
+    it('should build form controls for custom-delimited variables', () => {
+      expect(component.form.contains('serviceName')).toBeTrue();
+      expect(component.form.contains('version')).toBeTrue();
+    });
+
+    it('should not extract default {{ }} variables when custom delimiters are set', () => {
+      const mixedSteps: TemplateStep[] = [
+        { id: 11, templateId: 3, position: 1, title: 'Mix', instructions: '@{myVar} and {{ignored}}', createdAt: '' },
+      ];
+      templatesApi.getSteps.and.returnValue(of(mixedSteps));
+      component.selectTemplate(CUSTOM_TEMPLATE);
+      expect(component.variableNames()).toEqual(['myVar']);
+      expect(component.form.contains('ignored')).toBeFalse();
     });
   });
 
