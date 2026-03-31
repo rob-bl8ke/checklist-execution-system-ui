@@ -8,7 +8,8 @@ import {
 import { Router } from '@angular/router';
 import { DashboardApiService } from '../../services/dashboard-api.service';
 import { InstancesApiService } from '../../services/instances-api.service';
-import { DashboardRun } from '../../models/api.models';
+import { TodosApiService } from '../../services/todos-api.service';
+import { DashboardRun, Todo } from '../../models/api.models';
 import { LoadingSpinnerComponent } from '../../components/loading-spinner/loading-spinner.component';
 
 @Component({
@@ -79,7 +80,17 @@ import { LoadingSpinnerComponent } from '../../components/loading-spinner/loadin
           } @else {
             <ul class="bg-white rounded-xl shadow-sm divide-y divide-gray-200 overflow-hidden">
               @for (todo of todos(); track todo.id) {
-                <li class="px-5 py-3 text-sm text-gray-800">{{ todo.title }}</li>
+                <li class="flex items-center gap-3 px-5 py-3">
+                  <input
+                    type="checkbox"
+                    class="w-4 h-4 rounded border-gray-300 accent-blue-600 cursor-pointer disabled:opacity-50"
+                    [checked]="false"
+                    [disabled]="togglingTodoId() === todo.id"
+                    (change)="toggleTodo(todo)"
+                    [attr.aria-label]="'Mark ' + todo.title + ' complete'"
+                  />
+                  <span class="flex-1 text-sm text-gray-800">{{ todo.title }}</span>
+                </li>
               }
             </ul>
           }
@@ -91,13 +102,15 @@ import { LoadingSpinnerComponent } from '../../components/loading-spinner/loadin
 export class TodayComponent implements OnInit {
   private readonly dashboardApi = inject(DashboardApiService);
   private readonly instancesApi = inject(InstancesApiService);
+  private readonly todosApi = inject(TodosApiService);
   private readonly router = inject(Router);
 
   readonly runs = signal<DashboardRun[]>([]);
-  readonly todos = signal<{ id: number; title: string }[]>([]);
+  readonly todos = signal<Todo[]>([]);
   readonly loading = signal(true);
   readonly completingStepId = signal<number | null>(null);
   readonly stepError = signal<Record<number, string>>({});
+  readonly togglingTodoId = signal<number | null>(null);
 
   ngOnInit(): void {
     this.loadDashboard();
@@ -129,6 +142,19 @@ export class TodayComponent implements OnInit {
       error: () => {
         this.completingStepId.set(null);
         this.stepError.update((errs) => ({ ...errs, [run.id]: 'Failed to complete step.' }));
+      },
+    });
+  }
+
+  toggleTodo(todo: Todo): void {
+    this.togglingTodoId.set(todo.id);
+    this.todosApi.updateTodo(todo.id, { completed: true }).subscribe({
+      next: () => {
+        this.todos.update((ts) => ts.filter((t) => t.id !== todo.id));
+        this.togglingTodoId.set(null);
+      },
+      error: () => {
+        this.togglingTodoId.set(null);
       },
     });
   }
