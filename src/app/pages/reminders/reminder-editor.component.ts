@@ -9,6 +9,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { RemindersApiService } from '../../services/reminders-api.service';
 import { TemplatesApiService } from '../../services/templates-api.service';
+import { OccurrencePreviewService } from '../../services/occurrence-preview.service';
 import {
   ReminderDefinition,
   Template,
@@ -282,6 +283,23 @@ const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
             </div>
           }
 
+          <!-- Occurrence preview -->
+          @if (previewDates.length > 0) {
+            <div class="border-t border-gray-100 pt-4">
+              <p class="text-sm font-medium text-gray-700 mb-2">Upcoming occurrences (preview)</p>
+              <ul class="flex flex-col gap-1">
+                @for (d of previewDates; track d) {
+                  <li class="text-xs text-gray-600 flex gap-4">
+                    <span>{{ formatPreviewDate(d) }}</span>
+                    @if (leadTimeDays > 0) {
+                      <span class="text-gray-400">prep from {{ formatPreviewDate(prepStartDateFor(d)) }}</span>
+                    }
+                  </li>
+                }
+              </ul>
+            </div>
+          }
+
           @if (saveError()) {
             <p class="text-red-600 text-sm">{{ saveError() }}</p>
           }
@@ -310,6 +328,7 @@ const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 export class ReminderEditorComponent implements OnInit {
   private readonly api = inject(RemindersApiService);
   private readonly templatesApi = inject(TemplatesApiService);
+  private readonly occurrencePreview = inject(OccurrencePreviewService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
@@ -336,6 +355,23 @@ export class ReminderEditorComponent implements OnInit {
   active = true;
 
   private reminderId: number | null = null;
+
+  get previewDates(): string[] {
+    return this.occurrencePreview.computePreviewDates({
+      cadence: this.cadence,
+      interval: this.interval,
+      anchorDate: this.anchorDate,
+      weekdays: this.weekdays,
+    });
+  }
+
+  formatPreviewDate(dateStr: string): string {
+    return this.occurrencePreview.formatPreviewDate(dateStr);
+  }
+
+  prepStartDateFor(occurrenceDate: string): string {
+    return this.occurrencePreview.prepStartDateFor(occurrenceDate, this.leadTimeDays);
+  }
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
