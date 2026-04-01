@@ -60,6 +60,16 @@ import { EmptyStateComponent } from '../../components/empty-state/empty-state.co
               <div class="flex items-center gap-3">
                 <button
                   type="button"
+                  class="text-xs transition-colors"
+                  [class]="reminder.active ? 'text-yellow-600 hover:text-yellow-800' : 'text-green-600 hover:text-green-800'"
+                  [disabled]="togglingId() === reminder.id"
+                  (click)="$event.stopPropagation(); toggleActive(reminder)"
+                  [attr.aria-label]="(reminder.active ? 'Deactivate ' : 'Activate ') + reminder.title"
+                >
+                  {{ togglingId() === reminder.id ? '…' : (reminder.active ? 'Deactivate' : 'Activate') }}
+                </button>
+                <button
+                  type="button"
                   class="text-red-400 hover:text-red-600 text-xs transition-colors"
                   (click)="$event.stopPropagation(); deleteReminder(reminder)"
                   [attr.aria-label]="'Delete ' + reminder.title"
@@ -81,6 +91,7 @@ export class RemindersComponent implements OnInit {
   readonly reminders = signal<ReminderDefinition[]>([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
+  readonly togglingId = signal<number | null>(null);
 
   ngOnInit(): void {
     this.load();
@@ -107,6 +118,21 @@ export class RemindersComponent implements OnInit {
 
   editReminder(id: number): void {
     this.router.navigate(['/reminders', id]);
+  }
+
+  toggleActive(reminder: ReminderDefinition): void {
+    this.togglingId.set(reminder.id);
+    this.api.updateReminder(reminder.id, { active: !reminder.active }).subscribe({
+      next: (updated) => {
+        this.reminders.update((items) =>
+          items.map((r) => (r.id === updated.id ? updated : r)),
+        );
+        this.togglingId.set(null);
+      },
+      error: () => {
+        this.togglingId.set(null);
+      },
+    });
   }
 
   deleteReminder(reminder: ReminderDefinition): void {
