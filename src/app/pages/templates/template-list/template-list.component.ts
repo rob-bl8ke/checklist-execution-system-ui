@@ -119,8 +119,12 @@ export class TemplateListComponent implements OnInit {
       next: () => {
         this.templates.update((list) => list.filter((t) => t.id !== tmpl.id));
       },
-      error: () => {
-        this.error.set('Failed to delete template. Please try again.');
+      error: (err) => {
+        const msg =
+          err?.status === 409
+            ? 'Cannot delete: one or more reminders reference this template. Remove or update those reminders first.'
+            : 'Failed to delete template. Please try again.';
+        this.error.set(msg);
       },
     });
   }
