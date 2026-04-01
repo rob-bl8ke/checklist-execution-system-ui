@@ -9,7 +9,8 @@ import { Router } from '@angular/router';
 import { DashboardApiService } from '../../services/dashboard-api.service';
 import { InstancesApiService } from '../../services/instances-api.service';
 import { TodosApiService } from '../../services/todos-api.service';
-import { DashboardRun, Todo } from '../../models/api.models';
+import { RemindersApiService } from '../../services/reminders-api.service';
+import { DashboardRun, ReminderAgendaItem, Todo } from '../../models/api.models';
 import { LoadingSpinnerComponent } from '../../components/loading-spinner/loading-spinner.component';
 
 @Component({
@@ -23,6 +24,76 @@ import { LoadingSpinnerComponent } from '../../components/loading-spinner/loadin
       @if (loading()) {
         <app-loading-spinner label="Loading dashboard…" />
       } @else {
+        <!-- Ready Now reminders -->
+        @if (dueNow().length > 0) {
+          <section class="mb-8">
+            <h2 class="text-lg font-semibold text-gray-700 mb-3">Ready Now</h2>
+            <div class="flex flex-col gap-3">
+              @for (item of dueNow(); track item.reminderId + '_' + item.occurrenceDate) {
+                <div class="bg-white rounded-xl shadow-sm p-5 flex flex-col gap-2">
+                  <div class="flex items-center justify-between">
+                    <div class="flex flex-col gap-0.5">
+                      <span class="font-medium text-gray-900">{{ item.title }}</span>
+                      @if (item.category) {
+                        <span class="text-xs text-gray-400">{{ item.category }}</span>
+                      }
+                    </div>
+                    <div class="flex gap-2">
+                      @if (item.canStartRun && item.linkedTemplateId) {
+                        <button
+                          type="button"
+                          class="px-3 py-1.5 text-xs rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                          [disabled]="togglingOccurrenceKey() === item.reminderId + '_' + item.occurrenceDate"
+                          (click)="startRun(item)"
+                        >
+                          Start Run
+                        </button>
+                      }
+                      <button
+                        type="button"
+                        class="px-3 py-1.5 text-xs rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+                        [disabled]="togglingOccurrenceKey() === item.reminderId + '_' + item.occurrenceDate"
+                        (click)="markOccurrenceDone(item)"
+                      >
+                        {{ togglingOccurrenceKey() === item.reminderId + '_' + item.occurrenceDate ? '…' : 'Done' }}
+                      </button>
+                      <button
+                        type="button"
+                        class="px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50"
+                        [disabled]="togglingOccurrenceKey() === item.reminderId + '_' + item.occurrenceDate"
+                        (click)="dismissOccurrence(item)"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                  <span class="text-xs text-gray-400">Due {{ item.occurrenceDate }}{{ item.isOverdue ? ' (overdue)' : '' }}</span>
+                </div>
+              }
+            </div>
+          </section>
+        }
+
+        <!-- Coming Up reminders -->
+        @if (upcoming().length > 0) {
+          <section class="mb-8">
+            <h2 class="text-lg font-semibold text-gray-700 mb-3">Coming Up</h2>
+            <div class="flex flex-col gap-3">
+              @for (item of upcoming(); track item.reminderId + '_' + item.occurrenceDate) {
+                <div class="bg-white rounded-xl shadow-sm p-5 flex items-center justify-between">
+                  <div class="flex flex-col gap-0.5">
+                    <span class="font-medium text-gray-900">{{ item.title }}</span>
+                    @if (item.category) {
+                      <span class="text-xs text-gray-400">{{ item.category }}</span>
+                    }
+                  </div>
+                  <span class="text-xs text-gray-400">{{ item.occurrenceDate }} ({{ item.daysUntilOccurrence }}d)</span>
+                </div>
+              }
+            </div>
+          </section>
+        }
+
         <!-- Active runs -->
         <section class="mb-8">
           <h2 class="text-lg font-semibold text-gray-700 mb-3">Active Runs</h2>
@@ -103,14 +174,18 @@ export class TodayComponent implements OnInit {
   private readonly dashboardApi = inject(DashboardApiService);
   private readonly instancesApi = inject(InstancesApiService);
   private readonly todosApi = inject(TodosApiService);
+  private readonly remindersApi = inject(RemindersApiService);
   private readonly router = inject(Router);
 
   readonly runs = signal<DashboardRun[]>([]);
   readonly todos = signal<Todo[]>([]);
+  readonly dueNow = signal<ReminderAgendaItem[]>([]);
+  readonly upcoming = signal<ReminderAgendaItem[]>([]);
   readonly loading = signal(true);
   readonly completingStepId = signal<number | null>(null);
   readonly stepError = signal<Record<number, string>>({});
   readonly togglingTodoId = signal<number | null>(null);
+  readonly togglingOccurrenceKey = signal<string | null>(null);
 
   ngOnInit(): void {
     this.loadDashboard();
@@ -122,6 +197,8 @@ export class TodayComponent implements OnInit {
       next: (data) => {
         this.runs.set(data.runs);
         this.todos.set(data.todos.filter((t) => !t.completed));
+        this.dueNow.set(data.reminders.dueNow);
+        this.upcoming.set(data.reminders.upcoming);
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
@@ -159,7 +236,50 @@ export class TodayComponent implements OnInit {
     });
   }
 
+  markOccurrenceDone(item: ReminderAgendaItem): void {
+    const key = `${item.reminderId}_${item.occurrenceDate}`;
+    this.togglingOccurrenceKey.set(key);
+    this.remindersApi
+      .updateOccurrence(item.reminderId, item.occurrenceDate, { status: 'COMPLETED' })
+      .subscribe({
+        next: () => {
+          this.dueNow.update((items) =>
+            items.filter(
+              (i) => !(i.reminderId === item.reminderId && i.occurrenceDate === item.occurrenceDate),
+            ),
+          );
+          this.togglingOccurrenceKey.set(null);
+        },
+        error: () => this.togglingOccurrenceKey.set(null),
+      });
+  }
+
+  dismissOccurrence(item: ReminderAgendaItem): void {
+    const key = `${item.reminderId}_${item.occurrenceDate}`;
+    this.togglingOccurrenceKey.set(key);
+    this.remindersApi
+      .updateOccurrence(item.reminderId, item.occurrenceDate, { status: 'DISMISSED' })
+      .subscribe({
+        next: () => {
+          this.dueNow.update((items) =>
+            items.filter(
+              (i) => !(i.reminderId === item.reminderId && i.occurrenceDate === item.occurrenceDate),
+            ),
+          );
+          this.togglingOccurrenceKey.set(null);
+        },
+        error: () => this.togglingOccurrenceKey.set(null),
+      });
+  }
+
+  startRun(item: ReminderAgendaItem): void {
+    this.router.navigate(['/runs/new'], {
+      queryParams: { templateId: item.linkedTemplateId },
+    });
+  }
+
   openRun(id: number): void {
     this.router.navigate(['/runs', id]);
   }
 }
+

@@ -5,6 +5,8 @@ import { of, throwError } from 'rxjs';
 import { TodayComponent } from './today.component';
 import { DashboardApiService } from '../../services/dashboard-api.service';
 import { InstancesApiService } from '../../services/instances-api.service';
+import { TodosApiService } from '../../services/todos-api.service';
+import { RemindersApiService } from '../../services/reminders-api.service';
 import { DashboardResponse, InstanceStep } from '../../models/api.models';
 
 const MOCK_STEP_RESULT: InstanceStep = {
@@ -39,6 +41,7 @@ const MOCK_DASHBOARD: DashboardResponse = {
     { id: 2, title: 'Write tests',   completed: true,  description: null, createdAt: '', completedAt: null },
     { id: 3, title: 'Review PR',     completed: false, description: null, createdAt: '', completedAt: null },
   ],
+  reminders: { dueNow: [], upcoming: [] },
 };
 
 describe('TodayComponent', () => {
@@ -46,11 +49,15 @@ describe('TodayComponent', () => {
   let component: TodayComponent;
   let dashboardApi: jasmine.SpyObj<DashboardApiService>;
   let instancesApi: jasmine.SpyObj<InstancesApiService>;
+  let todosApi: jasmine.SpyObj<TodosApiService>;
+  let remindersApi: jasmine.SpyObj<RemindersApiService>;
   let router: jasmine.SpyObj<Router>;
 
   beforeEach(async () => {
     dashboardApi = jasmine.createSpyObj('DashboardApiService', ['getDashboard']);
     instancesApi = jasmine.createSpyObj('InstancesApiService', ['completeStep']);
+    todosApi = jasmine.createSpyObj('TodosApiService', ['updateTodo']);
+    remindersApi = jasmine.createSpyObj('RemindersApiService', ['updateOccurrence']);
     router = jasmine.createSpyObj('Router', ['navigate']);
     dashboardApi.getDashboard.and.returnValue(of(MOCK_DASHBOARD));
 
@@ -59,6 +66,8 @@ describe('TodayComponent', () => {
       providers: [
         { provide: DashboardApiService, useValue: dashboardApi },
         { provide: InstancesApiService, useValue: instancesApi },
+        { provide: TodosApiService, useValue: todosApi },
+        { provide: RemindersApiService, useValue: remindersApi },
         { provide: Router, useValue: router },
       ],
     }).compileComponents();

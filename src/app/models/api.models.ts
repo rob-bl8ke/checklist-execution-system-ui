@@ -125,6 +125,77 @@ export interface UpdateTodoDto {
 }
 
 // ---------------------------------------------------------------------------
+// Reminders
+// ---------------------------------------------------------------------------
+
+export type ReminderCadence = 'ONCE' | 'DAILY' | 'WEEKLY';
+export type ReminderOccurrenceStatus = 'COMPLETED' | 'DISMISSED' | 'OPEN';
+
+export interface ReminderDefinition {
+  id: number;
+  title: string;
+  description: string | null;
+  category: string | null;
+  cadence: ReminderCadence;
+  interval: number;
+  anchorDate: string;
+  weekdays: number[] | null;
+  timeOfDay: string | null;
+  leadTimeDays: number;
+  linkedTemplateId: number | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export interface ReminderAgendaItem {
+  reminderId: number;
+  title: string;
+  category: string | null;
+  occurrenceDate: string;
+  timeOfDay: string | null;
+  leadTimeDays: number;
+  linkedTemplateId: number | null;
+  linkedTemplateName: string | null;
+  currentStatus: ReminderOccurrenceStatus;
+  isInPrepWindow: boolean;
+  isOverdue: boolean;
+  daysUntilOccurrence: number;
+  canStartRun: boolean;
+}
+
+export interface CreateReminderDto {
+  title: string;
+  description?: string;
+  category?: string;
+  cadence: ReminderCadence;
+  interval?: number;
+  anchorDate: string;
+  weekdays?: number[];
+  timeOfDay?: string;
+  leadTimeDays?: number;
+  linkedTemplateId?: number;
+}
+
+export interface UpdateReminderDto {
+  title?: string;
+  description?: string;
+  category?: string;
+  cadence?: ReminderCadence;
+  interval?: number;
+  anchorDate?: string;
+  weekdays?: number[];
+  timeOfDay?: string;
+  leadTimeDays?: number;
+  linkedTemplateId?: number;
+  active?: boolean;
+}
+
+export interface UpdateReminderOccurrenceDto {
+  status: ReminderOccurrenceStatus;
+}
+
+// ---------------------------------------------------------------------------
 // Dashboard
 // ---------------------------------------------------------------------------
 
@@ -144,4 +215,8 @@ export interface DashboardRun {
 export interface DashboardResponse {
   runs: DashboardRun[];
   todos: Todo[];
+  reminders: {
+    dueNow: ReminderAgendaItem[];
+    upcoming: ReminderAgendaItem[];
+  };
 }

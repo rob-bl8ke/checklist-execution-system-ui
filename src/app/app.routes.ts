@@ -43,5 +43,20 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./pages/todos/todo-list/todo-list.component').then((m) => m.TodoListComponent),
   },
+  {
+    path: 'reminders',
+    loadComponent: () =>
+      import('./pages/reminders/reminders.component').then((m) => m.RemindersComponent),
+  },
+  {
+    path: 'reminders/new',
+    loadComponent: () =>
+      import('./pages/reminders/reminder-editor.component').then((m) => m.ReminderEditorComponent),
+  },
+  {
+    path: 'reminders/:id',
+    loadComponent: () =>
+      import('./pages/reminders/reminder-editor.component').then((m) => m.ReminderEditorComponent),
+  },
   { path: '**', redirectTo: 'today' },
 ];
