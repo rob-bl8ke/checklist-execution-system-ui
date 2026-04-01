@@ -37,9 +37,9 @@ const MOCK_DASHBOARD: DashboardResponse = {
     },
   ],
   todos: [
-    { id: 1, title: 'Buy groceries', completed: false, description: null, createdAt: '', completedAt: null },
-    { id: 2, title: 'Write tests',   completed: true,  description: null, createdAt: '', completedAt: null },
-    { id: 3, title: 'Review PR',     completed: false, description: null, createdAt: '', completedAt: null },
+    { id: 1, title: 'Buy groceries', completed: false, description: null, dueDate: null,         priority: 'NORMAL'   as const, createdAt: '', completedAt: null },
+    { id: 2, title: 'Write tests',   completed: true,  description: null, dueDate: null,         priority: 'HIGH'     as const, createdAt: '', completedAt: null },
+    { id: 3, title: 'Review PR',     completed: false, description: null, dueDate: '2000-01-01', priority: 'CRITICAL' as const, createdAt: '', completedAt: null },
   ],
   reminders: { dueNow: [], upcoming: [] },
 };
@@ -234,6 +234,34 @@ describe('TodayComponent', () => {
         ['/runs/new'],
         { queryParams: { templateId: 42 } },
       );
+    });
+  });
+
+  describe('priorityClass', () => {
+    it('should return red classes for CRITICAL', () => {
+      expect(component.priorityClass('CRITICAL')).toContain('red');
+    });
+
+    it('should return orange classes for HIGH', () => {
+      expect(component.priorityClass('HIGH')).toContain('orange');
+    });
+
+    it('should return blue classes for NORMAL', () => {
+      expect(component.priorityClass('NORMAL')).toContain('blue');
+    });
+
+    it('should return gray classes for LOW', () => {
+      expect(component.priorityClass('LOW')).toContain('gray');
+    });
+  });
+
+  describe('isOverdue', () => {
+    it('should return true for a past date', () => {
+      expect(component.isOverdue('2000-01-01')).toBeTrue();
+    });
+
+    it('should return false for a future date', () => {
+      expect(component.isOverdue('2099-12-31')).toBeFalse();
     });
   });
 });

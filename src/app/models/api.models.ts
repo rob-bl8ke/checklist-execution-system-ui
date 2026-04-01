@@ -104,10 +104,14 @@ export interface UpdateInstanceStatusDto {
 // Todos
 // ---------------------------------------------------------------------------
 
+export type TodoPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'CRITICAL';
+
 export interface Todo {
   id: number;
   title: string;
   description: string | null;
+  dueDate: string | null;
+  priority: TodoPriority;
   completed: boolean;
   createdAt: string;
   completedAt: string | null;
@@ -116,11 +120,15 @@ export interface Todo {
 export interface CreateTodoDto {
   title: string;
   description?: string;
+  dueDate?: string;
+  priority?: TodoPriority;
 }
 
 export interface UpdateTodoDto {
   title?: string;
-  description?: string;
+  description?: string | null;
+  dueDate?: string | null;
+  priority?: TodoPriority;
   completed?: boolean;
 }
 

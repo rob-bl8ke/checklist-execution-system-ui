@@ -10,7 +10,7 @@ import { DashboardApiService } from '../../services/dashboard-api.service';
 import { InstancesApiService } from '../../services/instances-api.service';
 import { TodosApiService } from '../../services/todos-api.service';
 import { RemindersApiService } from '../../services/reminders-api.service';
-import { DashboardRun, ReminderAgendaItem, Todo } from '../../models/api.models';
+import { DashboardRun, ReminderAgendaItem, Todo, TodoPriority } from '../../models/api.models';
 import { LoadingSpinnerComponent } from '../../components/loading-spinner/loading-spinner.component';
 
 @Component({
@@ -151,16 +151,28 @@ import { LoadingSpinnerComponent } from '../../components/loading-spinner/loadin
           } @else {
             <ul class="bg-white rounded-xl shadow-sm divide-y divide-gray-200 overflow-hidden">
               @for (todo of todos(); track todo.id) {
-                <li class="flex items-center gap-3 px-5 py-3">
+                <li class="flex items-start gap-3 px-5 py-3">
                   <input
                     type="checkbox"
-                    class="w-4 h-4 rounded border-gray-300 accent-blue-600 cursor-pointer disabled:opacity-50"
+                    class="mt-0.5 w-4 h-4 rounded border-gray-300 accent-blue-600 cursor-pointer disabled:opacity-50 shrink-0"
                     [checked]="false"
                     [disabled]="togglingTodoId() === todo.id"
                     (change)="toggleTodo(todo)"
                     [attr.aria-label]="'Mark ' + todo.title + ' complete'"
                   />
-                  <span class="flex-1 text-sm text-gray-800">{{ todo.title }}</span>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="text-sm text-gray-800">{{ todo.title }}</span>
+                      <span [class]="'text-xs px-1.5 py-0.5 rounded font-medium ' + priorityClass(todo.priority)">
+                        {{ todo.priority }}
+                      </span>
+                      @if (todo.dueDate) {
+                        <span [class]="'text-xs ' + (isOverdue(todo.dueDate) ? 'text-red-600 font-medium' : 'text-gray-500')">
+                          @if (isOverdue(todo.dueDate)) { ⚠ Overdue · }Due {{ todo.dueDate }}
+                        </span>
+                      }
+                    </div>
+                  </div>
                 </li>
               }
             </ul>
@@ -280,6 +292,21 @@ export class TodayComponent implements OnInit {
 
   openRun(id: number): void {
     this.router.navigate(['/runs', id]);
+  }
+
+  private readonly today = new Date().toISOString().slice(0, 10);
+
+  priorityClass(priority: TodoPriority): string {
+    switch (priority) {
+      case 'CRITICAL': return 'bg-red-100 text-red-700';
+      case 'HIGH':     return 'bg-orange-100 text-orange-700';
+      case 'NORMAL':   return 'bg-blue-100 text-blue-700';
+      case 'LOW':      return 'bg-gray-100 text-gray-500';
+    }
+  }
+
+  isOverdue(dueDate: string): boolean {
+    return dueDate < this.today;
   }
 }
 
