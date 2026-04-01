@@ -151,16 +151,16 @@ export interface ReminderDefinition {
 export interface ReminderAgendaItem {
   reminderId: number;
   title: string;
+  description: string | null;
   category: string | null;
   occurrenceDate: string;
+  prepStartDate: string;
   timeOfDay: string | null;
-  leadTimeDays: number;
-  linkedTemplateId: number | null;
-  linkedTemplateName: string | null;
-  currentStatus: ReminderOccurrenceStatus;
+  status: ReminderOccurrenceStatus;
   isInPrepWindow: boolean;
   isOverdue: boolean;
   daysUntilOccurrence: number;
+  linkedTemplate: { id: number; name: string } | null;
   canStartRun: boolean;
 }
 

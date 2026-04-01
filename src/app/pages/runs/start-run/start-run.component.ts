@@ -5,7 +5,7 @@ import {
   OnInit,
   signal,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { TemplatesApiService } from '../../../services/templates-api.service';
 import { InstancesApiService } from '../../../services/instances-api.service';
@@ -136,6 +136,7 @@ export class StartRunComponent implements OnInit {
   private readonly templatesApi = inject(TemplatesApiService);
   private readonly instancesApi = inject(InstancesApiService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   readonly templates = signal<Template[]>([]);
   readonly loadingTemplates = signal(true);
@@ -148,10 +149,18 @@ export class StartRunComponent implements OnInit {
   form: FormGroup = new FormGroup({});
 
   ngOnInit(): void {
+    const templateId = this.route.snapshot.queryParamMap.get('templateId');
     this.templatesApi.getTemplates().subscribe({
       next: (templates) => {
         this.templates.set(templates);
         this.loadingTemplates.set(false);
+        if (templateId) {
+          const id = Number(templateId);
+          const match = templates.find((t) => t.id === id);
+          if (match) {
+            this.selectTemplate(match);
+          }
+        }
       },
       error: () => this.loadingTemplates.set(false),
     });

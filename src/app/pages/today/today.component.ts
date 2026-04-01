@@ -39,7 +39,7 @@ import { LoadingSpinnerComponent } from '../../components/loading-spinner/loadin
                       }
                     </div>
                     <div class="flex gap-2">
-                      @if (item.canStartRun && item.linkedTemplateId) {
+                      @if (item.canStartRun && item.linkedTemplate) {
                         <button
                           type="button"
                           class="px-3 py-1.5 text-xs rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
@@ -274,7 +274,7 @@ export class TodayComponent implements OnInit {
 
   startRun(item: ReminderAgendaItem): void {
     this.router.navigate(['/runs/new'], {
-      queryParams: { templateId: item.linkedTemplateId },
+      queryParams: { templateId: item.linkedTemplate!.id },
     });
   }
 

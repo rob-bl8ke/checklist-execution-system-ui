@@ -7,7 +7,7 @@ import { DashboardApiService } from '../../services/dashboard-api.service';
 import { InstancesApiService } from '../../services/instances-api.service';
 import { TodosApiService } from '../../services/todos-api.service';
 import { RemindersApiService } from '../../services/reminders-api.service';
-import { DashboardResponse, InstanceStep } from '../../models/api.models';
+import { DashboardResponse, InstanceStep, ReminderAgendaItem } from '../../models/api.models';
 
 const MOCK_STEP_RESULT: InstanceStep = {
   id: 11,
@@ -195,6 +195,45 @@ describe('TodayComponent', () => {
       component.completeStep(MOCK_DASHBOARD.runs[0]);
       expect(component.runs().length).toBe(1);
       expect(component.runs()[0].id).toBe(2);
+    });
+  });
+
+  describe('startRun navigation (issue #41)', () => {
+    const MOCK_REMINDER_ITEM: ReminderAgendaItem = {
+      reminderId: 5,
+      title: 'Sprint Retro',
+      description: null,
+      category: 'Team',
+      occurrenceDate: '2026-04-01',
+      prepStartDate: '2026-03-28',
+      timeOfDay: null,
+      status: 'OPEN',
+      isInPrepWindow: false,
+      isOverdue: false,
+      daysUntilOccurrence: 0,
+      linkedTemplate: { id: 7, name: 'Retro Template' },
+      canStartRun: true,
+    };
+
+    it('should navigate to /runs/new with the correct templateId query param', () => {
+      component.startRun(MOCK_REMINDER_ITEM);
+      expect(router.navigate).toHaveBeenCalledWith(
+        ['/runs/new'],
+        { queryParams: { templateId: 7 } },
+      );
+    });
+
+    it('should use the linkedTemplate id from the agenda item', () => {
+      const otherItem: ReminderAgendaItem = {
+        ...MOCK_REMINDER_ITEM,
+        reminderId: 9,
+        linkedTemplate: { id: 42, name: 'Other Template' },
+      };
+      component.startRun(otherItem);
+      expect(router.navigate).toHaveBeenCalledWith(
+        ['/runs/new'],
+        { queryParams: { templateId: 42 } },
+      );
     });
   });
 });

@@ -1,5 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { of, throwError } from 'rxjs';
 
 import { StartRunComponent, extractVariables } from './start-run.component';
@@ -89,6 +89,10 @@ describe('StartRunComponent', () => {
   let instancesApi: jasmine.SpyObj<InstancesApiService>;
   let router: jasmine.SpyObj<Router>;
 
+  function makeActivatedRoute(templateId: string | null): { snapshot: { queryParamMap: { get: (k: string) => string | null } } } {
+    return { snapshot: { queryParamMap: { get: (_k: string) => templateId } } };
+  }
+
   beforeEach(async () => {
     templatesApi = jasmine.createSpyObj('TemplatesApiService', ['getTemplates', 'getSteps']);
     instancesApi = jasmine.createSpyObj('InstancesApiService', ['createInstance']);
@@ -101,6 +105,7 @@ describe('StartRunComponent', () => {
         { provide: TemplatesApiService, useValue: templatesApi },
         { provide: InstancesApiService, useValue: instancesApi },
         { provide: Router, useValue: router },
+        { provide: ActivatedRoute, useValue: makeActivatedRoute(null) },
       ],
     }).compileComponents();
 
@@ -233,5 +238,96 @@ describe('StartRunComponent', () => {
   it('should navigate back to /runs on goBack', () => {
     component.goBack();
     expect(router.navigate).toHaveBeenCalledWith(['/runs']);
+  });
+
+  describe('templateId query param (issue #41)', () => {
+    describe('when templateId matches a loaded template', () => {
+      beforeEach(async () => {
+        templatesApi = jasmine.createSpyObj('TemplatesApiService', ['getTemplates', 'getSteps']);
+        instancesApi = jasmine.createSpyObj('InstancesApiService', ['createInstance']);
+        router = jasmine.createSpyObj('Router', ['navigate']);
+        templatesApi.getTemplates.and.returnValue(of(MOCK_TEMPLATES));
+        templatesApi.getSteps.and.returnValue(of(MOCK_STEPS));
+
+        await TestBed.resetTestingModule();
+        await TestBed.configureTestingModule({
+          imports: [StartRunComponent],
+          providers: [
+            { provide: TemplatesApiService, useValue: templatesApi },
+            { provide: InstancesApiService, useValue: instancesApi },
+            { provide: Router, useValue: router },
+            { provide: ActivatedRoute, useValue: makeActivatedRoute('1') },
+          ],
+        }).compileComponents();
+
+        fixture = TestBed.createComponent(StartRunComponent);
+        component = fixture.componentInstance;
+        fixture.detectChanges();
+      });
+
+      it('should skip the select step and advance directly to the form', () => {
+        expect(component.flowStep()).toBe('form');
+      });
+
+      it('should set the matching template as selectedTemplate', () => {
+        expect(component.selectedTemplate()?.id).toBe(1);
+        expect(component.selectedTemplate()?.name).toBe('Deploy');
+      });
+
+      it('should load steps for the matched template', () => {
+        expect(templatesApi.getSteps).toHaveBeenCalledWith(1);
+      });
+
+      it('should extract variables from the matched template steps', () => {
+        expect(component.variableNames()).toEqual(['serviceName', 'version']);
+      });
+    });
+
+    describe('when templateId does not match any template', () => {
+      beforeEach(async () => {
+        templatesApi = jasmine.createSpyObj('TemplatesApiService', ['getTemplates', 'getSteps']);
+        instancesApi = jasmine.createSpyObj('InstancesApiService', ['createInstance']);
+        router = jasmine.createSpyObj('Router', ['navigate']);
+        templatesApi.getTemplates.and.returnValue(of(MOCK_TEMPLATES));
+
+        await TestBed.resetTestingModule();
+        await TestBed.configureTestingModule({
+          imports: [StartRunComponent],
+          providers: [
+            { provide: TemplatesApiService, useValue: templatesApi },
+            { provide: InstancesApiService, useValue: instancesApi },
+            { provide: Router, useValue: router },
+            { provide: ActivatedRoute, useValue: makeActivatedRoute('999') },
+          ],
+        }).compileComponents();
+
+        fixture = TestBed.createComponent(StartRunComponent);
+        component = fixture.componentInstance;
+        fixture.detectChanges();
+      });
+
+      it('should remain on the select step', () => {
+        expect(component.flowStep()).toBe('select');
+      });
+
+      it('should not call getSteps for an unmatched templateId', () => {
+        expect(templatesApi.getSteps).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('when no templateId query param is present', () => {
+      it('should remain on the select step', () => {
+        // Default beforeEach already uses makeActivatedRoute(null)
+        expect(component.flowStep()).toBe('select');
+      });
+
+      it('should not auto-select any template', () => {
+        expect(component.selectedTemplate()).toBeNull();
+      });
+
+      it('should not call getSteps automatically', () => {
+        expect(templatesApi.getSteps).not.toHaveBeenCalled();
+      });
+    });
   });
 });
