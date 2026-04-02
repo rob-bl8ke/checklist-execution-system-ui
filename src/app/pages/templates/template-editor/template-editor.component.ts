@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   inject,
   OnInit,
   signal,
@@ -16,6 +17,7 @@ import { TemplatesApiService } from '../../../services/templates-api.service';
 import { Template, TemplateStep } from '../../../models/api.models';
 import { LoadingSpinnerComponent } from '../../../components/loading-spinner/loading-spinner.component';
 import { StepEditorComponent } from '../step-editor/step-editor.component';
+import { ConfirmDialogComponent } from '../../../components/confirm-dialog/confirm-dialog.component';
 
 @Component({
   selector: 'app-template-editor',
@@ -25,6 +27,7 @@ import { StepEditorComponent } from '../step-editor/step-editor.component';
     DragDropModule,
     LoadingSpinnerComponent,
     StepEditorComponent,
+    ConfirmDialogComponent,
   ],
   template: `
     <div class="max-w-3xl mx-auto">
@@ -162,6 +165,12 @@ import { StepEditorComponent } from '../step-editor/step-editor.component';
                     >
                       {{ step.title }}
                     </button>
+                    <button
+                      type="button"
+                      class="text-gray-400 hover:text-red-600 text-sm px-1"
+                      aria-label="Delete step"
+                      (click)="confirmDeleteStep(step)"
+                    >✕</button>
                   </li>
                 }
               </ul>
@@ -183,6 +192,15 @@ import { StepEditorComponent } from '../step-editor/step-editor.component';
         (cancel)="editingStep.set(undefined)"
       />
     }
+
+    @if (stepToDelete() !== undefined) {
+      <app-confirm-dialog
+        title="Delete Step"
+        [message]="deleteStepMessage()"
+        (confirmed)="executeDeleteStep()"
+        (cancelled)="stepToDelete.set(undefined)"
+      />
+    }
   `,
 })
 export class TemplateEditorComponent implements OnInit {
@@ -199,6 +217,13 @@ export class TemplateEditorComponent implements OnInit {
   readonly dragError = signal<string | null>(null);
   /** undefined = editor closed; null = new step; TemplateStep = edit mode */
   readonly editingStep = signal<TemplateStep | null | undefined>(undefined);
+  /** undefined = dialog closed; TemplateStep = confirm delete for that step */
+  readonly stepToDelete = signal<TemplateStep | undefined>(undefined);
+  readonly deleteError = signal<string | null>(null);
+  readonly deleteStepMessage = computed(() => {
+    const s = this.stepToDelete();
+    return s ? `Delete step "${s.title}"? This cannot be undone.` : '';
+  });
 
   name = '';
   description = '';
@@ -314,6 +339,26 @@ export class TemplateEditorComponent implements OnInit {
           this.dragError.set('Failed to reorder step. Please try again.');
         },
       });
+  }
+
+  confirmDeleteStep(step: TemplateStep): void {
+    this.stepToDelete.set(step);
+  }
+
+  executeDeleteStep(): void {
+    const step = this.stepToDelete();
+    if (!step) return;
+    this.api.deleteStep(this.templateId()!, step.id).subscribe({
+      next: () => {
+        this.steps.update((list) => list.filter((s) => s.id !== step.id));
+        this.stepToDelete.set(undefined);
+        this.deleteError.set(null);
+      },
+      error: () => {
+        this.stepToDelete.set(undefined);
+        this.deleteError.set('Failed to delete step. Please try again.');
+      },
+    });
   }
 
   goBack(): void {

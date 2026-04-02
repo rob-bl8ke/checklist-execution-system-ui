@@ -35,7 +35,7 @@ describe('TemplateEditorComponent — edit mode', () => {
 
   beforeEach(async () => {
     api = jasmine.createSpyObj('TemplatesApiService', [
-      'getTemplate', 'getSteps', 'createTemplate', 'updateTemplate', 'moveStep',
+      'getTemplate', 'getSteps', 'createTemplate', 'updateTemplate', 'moveStep', 'deleteStep',
     ]);
     router = jasmine.createSpyObj('Router', ['navigate']);
     api.getTemplate.and.returnValue(of(MOCK_TEMPLATE));
@@ -150,6 +150,38 @@ describe('TemplateEditorComponent — edit mode', () => {
     component.goBack();
     expect(router.navigate).toHaveBeenCalledWith(['/templates']);
   });
+
+  it('should set stepToDelete when confirmDeleteStep is called', () => {
+    component.confirmDeleteStep(MOCK_STEPS[0]);
+    expect(component.stepToDelete()).toEqual(MOCK_STEPS[0]);
+  });
+
+  it('should remove step and clear stepToDelete on successful delete', () => {
+    api.deleteStep.and.returnValue(of(undefined));
+    component.confirmDeleteStep(MOCK_STEPS[0]);
+    component.executeDeleteStep();
+    expect(api.deleteStep).toHaveBeenCalledWith(7, MOCK_STEPS[0].id);
+    expect(component.steps().length).toBe(1);
+    expect(component.steps()[0]).toEqual(MOCK_STEPS[1]);
+    expect(component.stepToDelete()).toBeUndefined();
+    expect(component.deleteError()).toBeNull();
+  });
+
+  it('should set deleteError and clear stepToDelete when deleteStep fails', () => {
+    api.deleteStep.and.returnValue(throwError(() => new Error('fail')));
+    component.confirmDeleteStep(MOCK_STEPS[0]);
+    component.executeDeleteStep();
+    expect(component.deleteError()).toBe('Failed to delete step. Please try again.');
+    expect(component.stepToDelete()).toBeUndefined();
+    expect(component.steps().length).toBe(2);
+  });
+
+  it('should not call deleteStep when stepToDelete is cleared before executeDeleteStep', () => {
+    component.confirmDeleteStep(MOCK_STEPS[0]);
+    component.stepToDelete.set(undefined);
+    component.executeDeleteStep();
+    expect(api.deleteStep).not.toHaveBeenCalled();
+  });
 });
 
 describe('TemplateEditorComponent — create mode', () => {
@@ -160,7 +192,7 @@ describe('TemplateEditorComponent — create mode', () => {
 
   beforeEach(async () => {
     api = jasmine.createSpyObj('TemplatesApiService', [
-      'getTemplate', 'getSteps', 'createTemplate', 'updateTemplate', 'moveStep',
+      'getTemplate', 'getSteps', 'createTemplate', 'updateTemplate', 'moveStep', 'deleteStep',
     ]);
     router = jasmine.createSpyObj('Router', ['navigate']);
 
@@ -227,7 +259,7 @@ describe('TemplateEditorComponent — template with custom delimiters', () => {
 
   beforeEach(async () => {
     api = jasmine.createSpyObj('TemplatesApiService', [
-      'getTemplate', 'getSteps', 'createTemplate', 'updateTemplate', 'moveStep',
+      'getTemplate', 'getSteps', 'createTemplate', 'updateTemplate', 'moveStep', 'deleteStep',
     ]);
     api.getTemplate.and.returnValue(of(CUSTOM_TEMPLATE));
     api.getSteps.and.returnValue(of([]));
