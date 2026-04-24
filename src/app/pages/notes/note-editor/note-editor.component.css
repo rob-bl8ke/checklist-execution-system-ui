@@ -1,0 +1,11 @@
+:host {
+  display: block;
+}
+
+.note-preview {
+  scrollbar-gutter: stable;
+}
+
+code {
+  font-size: 0.875em;
+}

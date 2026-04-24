@@ -1,0 +1,321 @@
+<div class="max-w-5xl mx-auto space-y-6">
+  <header class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div class="flex items-center gap-3">
+      <button
+        type="button"
+        class="text-sm text-gray-500 transition-colors hover:text-gray-700"
+        (click)="goBack()"
+      >
+        ← Notes
+      </button>
+      <h1 class="text-2xl font-semibold text-gray-900">
+        {{ isCreateMode() ? 'Create Note' : 'Edit Note' }}
+      </h1>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3">
+      @if (!isCreateMode()) {
+        <button
+          type="button"
+          class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          [disabled]="savingVersion()"
+          (click)="saveVersion()"
+        >
+          {{ savingVersion() ? 'Saving Version…' : 'Save Version' }}
+        </button>
+      }
+      <button
+        type="button"
+        class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+        [disabled]="saving()"
+        (click)="save()"
+      >
+        {{ saving() ? 'Saving…' : 'Save' }}
+      </button>
+      @if (!isCreateMode()) {
+        <button
+          type="button"
+          class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+          [disabled]="deleting()"
+          (click)="confirmDelete()"
+        >
+          Delete
+        </button>
+      }
+    </div>
+  </header>
+
+  @if (loading()) {
+    <app-loading-spinner label="Loading note…" />
+  } @else {
+    @if (loadError()) {
+      <p class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        {{ loadError() }}
+      </p>
+    }
+
+    @if (saveError()) {
+      <p class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        {{ saveError() }}
+      </p>
+    }
+
+    @if (deleteError()) {
+      <p class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        {{ deleteError() }}
+      </p>
+    }
+
+    @if (versionMessage()) {
+      <p
+        class="rounded-xl px-4 py-3 text-sm"
+        [class.border]="true"
+        [class.border-green-200]="versionMessage() === 'Version saved successfully.'"
+        [class.bg-green-50]="versionMessage() === 'Version saved successfully.'"
+        [class.text-green-700]="versionMessage() === 'Version saved successfully.'"
+        [class.border-red-200]="versionMessage() === 'Failed to save version.'"
+        [class.bg-red-50]="versionMessage() === 'Failed to save version.'"
+        [class.text-red-700]="versionMessage() === 'Failed to save version.'"
+      >
+        {{ versionMessage() }}
+      </p>
+    }
+
+    <form class="space-y-6" [formGroup]="form" (ngSubmit)="save()">
+      <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
+        <div>
+          <label class="mb-2 block text-sm font-medium text-gray-700" for="note-title">Title</label>
+          <input
+            id="note-title"
+            type="text"
+            class="w-full rounded-lg border px-3 py-2 text-sm text-gray-900 outline-none transition focus:ring-2"
+            [class.border-red-300]="showControlError('title')"
+            [class.focus:ring-red-200]="showControlError('title')"
+            [class.border-gray-300]="!showControlError('title')"
+            [class.focus:ring-blue-200]="!showControlError('title')"
+            formControlName="title"
+            placeholder="Note title"
+          />
+          @if (showControlError('title')) {
+            <p class="mt-2 text-sm text-red-600">Title is required.</p>
+          }
+        </div>
+
+        <div class="grid gap-4 lg:grid-cols-2">
+          <div class="flex flex-col">
+            <label class="mb-2 block text-sm font-medium text-gray-700" for="note-body">Body (Markdown)</label>
+            <textarea
+              id="note-body"
+              class="min-h-[22rem] w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono text-gray-900 outline-none transition focus:ring-2 focus:ring-blue-200"
+              formControlName="body"
+              placeholder="Write your note in markdown…"
+            ></textarea>
+          </div>
+
+          <div class="flex flex-col">
+            <span class="mb-2 block text-sm font-medium text-gray-700">Preview</span>
+            <div class="note-preview min-h-[22rem] rounded-lg border border-gray-200 bg-gray-50 p-4 prose prose-sm max-w-none overflow-y-auto">
+              <markdown [data]="markdownPreview()" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900">Tags</h2>
+            <p class="mt-1 text-sm text-gray-500">Add tags to help you find this note later.</p>
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-3 sm:flex-row">
+          <div class="flex-1">
+            <label class="mb-2 block text-sm font-medium text-gray-700" for="note-tag-input">Add tag</label>
+            <input
+              id="note-tag-input"
+              type="text"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition focus:ring-2 focus:ring-blue-200"
+              [formControl]="tagInput"
+              [attr.list]="'note-tag-suggestions'"
+              placeholder="Type a tag and press Add"
+              (keydown.enter)="$event.preventDefault(); addTagFromInput()"
+            />
+            <datalist id="note-tag-suggestions">
+              @for (tag of filteredTagSuggestions(); track tag) {
+                <option [value]="tag"></option>
+              }
+            </datalist>
+          </div>
+          <div class="sm:pt-7">
+            <button
+              type="button"
+              class="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 sm:w-auto"
+              (click)="addTagFromInput()"
+            >
+              Add Tag
+            </button>
+          </div>
+        </div>
+
+        @if (filteredTagSuggestions().length > 0) {
+          <div class="flex flex-wrap gap-2">
+            @for (tag of filteredTagSuggestions(); track tag) {
+              <button
+                type="button"
+                class="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 transition hover:bg-blue-100"
+                (click)="addTag(tag)"
+              >
+                + {{ tag }}
+              </button>
+            }
+          </div>
+        }
+
+        @if (selectedTags().length > 0) {
+          <div class="flex flex-wrap gap-2">
+            @for (tag of selectedTags(); track tag) {
+              <span class="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700">
+                {{ tag }}
+                <button
+                  type="button"
+                  class="text-gray-500 transition hover:text-red-600"
+                  [attr.aria-label]="'Remove tag ' + tag"
+                  (click)="removeTag(tag)"
+                >
+                  ✕
+                </button>
+              </span>
+            }
+          </div>
+        }
+      </section>
+
+      <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
+        <button
+          type="button"
+          class="flex items-center gap-2 text-sm font-medium text-gray-700 transition hover:text-gray-900"
+          (click)="toggleDelimiters()"
+        >
+          <span>{{ showDelimiters() ? '▾' : '▸' }}</span>
+          Variable Delimiters
+        </button>
+
+        @if (showDelimiters()) {
+          <div class="space-y-4 border-l-2 border-gray-200 pl-4">
+            <p class="text-sm text-gray-500">
+              Set both prefix and suffix to override the default <code>&#123;&#123;</code> and <code>&#125;&#125;</code> delimiters.
+            </p>
+
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label class="mb-2 block text-sm font-medium text-gray-700" for="note-prefix">Prefix</label>
+                <input
+                  id="note-prefix"
+                  type="text"
+                  class="w-full rounded-lg border px-3 py-2 text-sm text-gray-900 outline-none transition focus:ring-2"
+                  [class.border-red-300]="showControlError('variablePrefix') || showDelimiterError()"
+                  [class.focus:ring-red-200]="showControlError('variablePrefix') || showDelimiterError()"
+                  [class.border-gray-300]="!showControlError('variablePrefix') && !showDelimiterError()"
+                  [class.focus:ring-blue-200]="!showControlError('variablePrefix') && !showDelimiterError()"
+                  formControlName="variablePrefix"
+                  maxlength="10"
+                  placeholder="{{"
+                />
+              </div>
+
+              <div>
+                <label class="mb-2 block text-sm font-medium text-gray-700" for="note-suffix">Suffix</label>
+                <input
+                  id="note-suffix"
+                  type="text"
+                  class="w-full rounded-lg border px-3 py-2 text-sm text-gray-900 outline-none transition focus:ring-2"
+                  [class.border-red-300]="showControlError('variableSuffix') || showDelimiterError()"
+                  [class.focus:ring-red-200]="showControlError('variableSuffix') || showDelimiterError()"
+                  [class.border-gray-300]="!showControlError('variableSuffix') && !showDelimiterError()"
+                  [class.focus:ring-blue-200]="!showControlError('variableSuffix') && !showDelimiterError()"
+                  formControlName="variableSuffix"
+                  maxlength="10"
+                  placeholder="}}"
+                />
+              </div>
+            </div>
+
+            @if (showControlError('variablePrefix') || showControlError('variableSuffix')) {
+              <p class="text-sm text-red-600">Variable delimiters must be 10 characters or fewer.</p>
+            }
+
+            @if (showDelimiterError()) {
+              <p class="text-sm text-red-600">
+                Variable prefix and suffix must both be provided or both left blank.
+              </p>
+            }
+          </div>
+        }
+      </section>
+
+      <section class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
+        <div>
+          <h2 class="text-lg font-semibold text-gray-900">AI Settings</h2>
+          <p class="mt-1 text-sm text-gray-500">Configure per-note AI assistance options.</p>
+        </div>
+
+        <label class="inline-flex items-center gap-3 text-sm font-medium text-gray-700">
+          <input
+            type="checkbox"
+            class="h-4 w-4 rounded border-gray-300 accent-blue-600"
+            formControlName="aiEnabled"
+          />
+          Enable AI for this note
+        </label>
+
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label class="mb-2 block text-sm font-medium text-gray-700" for="note-ai-provider">Provider</label>
+            <select
+              id="note-ai-provider"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition focus:ring-2 focus:ring-blue-200 disabled:cursor-not-allowed disabled:bg-gray-100"
+              formControlName="aiProviderKey"
+            >
+              <option value="">Select a provider</option>
+              @for (option of aiProviderOptions; track option.value) {
+                <option [value]="option.value">{{ option.label }}</option>
+              }
+            </select>
+          </div>
+
+          <div>
+            <label class="mb-2 block text-sm font-medium text-gray-700" for="note-ai-model">Model</label>
+            <input
+              id="note-ai-model"
+              type="text"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition focus:ring-2 focus:ring-blue-200 disabled:cursor-not-allowed disabled:bg-gray-100"
+              formControlName="aiModel"
+              placeholder="e.g. gpt-4.1"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label class="mb-2 block text-sm font-medium text-gray-700" for="note-ai-prompt">AI Prompt</label>
+          <textarea
+            id="note-ai-prompt"
+            rows="4"
+            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition focus:ring-2 focus:ring-blue-200 disabled:cursor-not-allowed disabled:bg-gray-100"
+            formControlName="aiPrompt"
+            placeholder="Optional instructions for the AI assistant"
+          ></textarea>
+        </div>
+      </section>
+    </form>
+  }
+</div>
+
+@if (deleteDialogOpen()) {
+  <app-confirm-dialog
+    title="Delete Note"
+    message="Delete this note? This action cannot be undone."
+    (confirmed)="deleteNote()"
+    (cancelled)="cancelDelete()"
+  />
+}
