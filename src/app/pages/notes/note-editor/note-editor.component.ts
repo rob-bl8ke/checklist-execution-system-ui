@@ -14,6 +14,7 @@ import {
   FormControl,
   FormGroup,
   ReactiveFormsModule,
+  UntypedFormGroup,
   ValidationErrors,
   Validators,
 } from '@angular/forms';
@@ -23,6 +24,7 @@ import { map, startWith } from 'rxjs';
 import { ConfirmDialogComponent } from '../../../components/confirm-dialog/confirm-dialog.component';
 import { LoadingSpinnerComponent } from '../../../components/loading-spinner/loading-spinner.component';
 import { AiProviderKey, Note } from '../../../models/api.models';
+import { extractVariables } from '../../runs/start-run/start-run.component';
 import { NotesApiService } from '../../../services/notes-api.service';
 
 const AI_PROVIDER_OPTIONS: ReadonlyArray<{ value: AiProviderKey; label: string }> = [
@@ -105,11 +107,15 @@ export class NoteEditorComponent implements OnInit {
   readonly versionMessage = signal<string | null>(null);
   readonly deleteError = signal<string | null>(null);
   readonly deleteDialogOpen = signal(false);
+  readonly generating = signal(false);
+  readonly generateError = signal<string | null>(null);
+  readonly generatedMarkdown = signal<string | null>(null);
 
   readonly aiProviderOptions = AI_PROVIDER_OPTIONS;
   readonly noteId = signal<number | null>(null);
   readonly isCreateMode = computed(() => this.noteId() === null);
   readonly showDelimiters = signal(false);
+  readonly variableForm = new UntypedFormGroup({});
   readonly formRawValue = signal<NoteEditorFormValue>(this.form.getRawValue());
   readonly initialSnapshot = signal<NoteEditorSnapshot>(
     this.createSnapshot(this.form.getRawValue(), this.selectedTags()),
@@ -140,6 +146,13 @@ export class NoteEditorComponent implements OnInit {
     ),
     { initialValue: this.form.controls.body.value || '_No content yet_' },
   );
+  readonly variableNames = computed(() => {
+    const formValue = this.formRawValue();
+    const prefix = formValue.variablePrefix.trim() || '{{';
+    const suffix = formValue.variableSuffix.trim() || '}}';
+    return extractVariables(formValue.body, prefix, suffix);
+  });
+  readonly hasGeneratePanel = computed(() => !this.isCreateMode() && this.variableNames().length > 0);
 
   ngOnInit(): void {
     const rawId = this.route.snapshot.paramMap.get('id');
@@ -152,6 +165,7 @@ export class NoteEditorComponent implements OnInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {
         this.formRawValue.set(this.form.getRawValue());
+        this.reconcileVariableForm();
       });
 
     this.form.controls.aiEnabled.valueChanges
@@ -185,6 +199,7 @@ export class NoteEditorComponent implements OnInit {
     }
 
     this.loadTags();
+    this.reconcileVariableForm();
   }
 
   @HostListener('window:beforeunload', ['$event'])
@@ -223,6 +238,26 @@ export class NoteEditorComponent implements OnInit {
 
   toggleDelimiters(): void {
     this.showDelimiters.update((value) => !value);
+  }
+
+  generatePreview(): void {
+    const existingId = this.noteId();
+    if (existingId === null) {
+      return;
+    }
+
+    this.generating.set(true);
+    this.generateError.set(null);
+    this.api.generateNote(existingId, this.getVariableValues()).subscribe({
+      next: ({ rendered }) => {
+        this.generating.set(false);
+        this.generatedMarkdown.set(rendered);
+      },
+      error: () => {
+        this.generating.set(false);
+        this.generateError.set('Failed to generate rendered note preview.');
+      },
+    });
   }
 
   save(): void {
@@ -374,6 +409,9 @@ export class NoteEditorComponent implements OnInit {
     }
     this.selectedTags.set(note.tags?.map((tag) => tag.tag) ?? []);
     this.showDelimiters.set(!!(note.variablePrefix || note.variableSuffix));
+    this.reconcileVariableForm();
+    this.generatedMarkdown.set(null);
+    this.generateError.set(null);
     this.resetDirtySnapshot();
   }
 
@@ -398,6 +436,30 @@ export class NoteEditorComponent implements OnInit {
   private resetDirtySnapshot(): void {
     this.formRawValue.set(this.form.getRawValue());
     this.initialSnapshot.set(this.createSnapshot(this.formRawValue(), this.selectedTags()));
+  }
+
+  private reconcileVariableForm(): void {
+    const names = this.variableNames();
+    const currentControls = this.variableForm.controls;
+
+    for (const controlName of Object.keys(currentControls)) {
+      if (!names.includes(controlName)) {
+        this.variableForm.removeControl(controlName);
+      }
+    }
+
+    for (const name of names) {
+      if (!this.variableForm.contains(name)) {
+        this.variableForm.addControl(name, new FormControl('', { nonNullable: true }));
+      }
+    }
+  }
+
+  private getVariableValues(): Record<string, string> {
+    return this.variableNames().reduce<Record<string, string>>((result, name) => {
+      result[name] = this.variableForm.controls[name]?.value ?? '';
+      return result;
+    }, {});
   }
 
   private createSnapshot(

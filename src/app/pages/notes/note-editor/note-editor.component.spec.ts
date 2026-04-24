@@ -43,6 +43,7 @@ describe('NoteEditorComponent - create mode', () => {
       'getTags',
       'createNote',
       'updateNote',
+      'generateNote',
       'createVersion',
       'deleteNote',
     ]);
@@ -192,6 +193,7 @@ describe('NoteEditorComponent - edit mode', () => {
       'getTags',
       'createNote',
       'updateNote',
+      'generateNote',
       'createVersion',
       'deleteNote',
     ]);
@@ -220,6 +222,60 @@ describe('NoteEditorComponent - edit mode', () => {
     expect(component.selectedTags()).toEqual(['ops', 'release']);
     expect(component.showDelimiters()).toBeTrue();
     expect(component.isDirty()).toBeFalse();
+  });
+
+  it('should extract variables from the note body using the current delimiters', () => {
+    component.form.controls.body.setValue('Deploy {{service}} to {{environment}} using {{service}}');
+
+    expect(component.variableNames()).toEqual(['service', 'environment']);
+  });
+
+  it('should respect custom delimiters when extracting variables', () => {
+    component.form.controls.variablePrefix.setValue('@{');
+    component.form.controls.variableSuffix.setValue('}');
+    component.form.controls.body.setValue('Deploy @{service} version @{version}');
+
+    expect(component.variableNames()).toEqual(['service', 'version']);
+  });
+
+  it('should generate rendered markdown from variable values', () => {
+    api.generateNote.and.returnValue(of({ rendered: 'Deploy api to prod' }));
+    component.form.controls.body.setValue('Deploy {{service}} to {{environment}}');
+
+    component['reconcileVariableForm']();
+    component.variableForm.controls['service'].setValue('api');
+    component.variableForm.controls['environment'].setValue('prod');
+
+    component.generatePreview();
+
+    expect(api.generateNote).toHaveBeenCalledWith(3, {
+      service: 'api',
+      environment: 'prod',
+    });
+    expect(component.generatedMarkdown()).toBe('Deploy api to prod');
+  });
+
+  it('should allow changing variable values and generating again', () => {
+    api.generateNote.and.returnValues(
+      of({ rendered: 'Deploy api to prod' }),
+      of({ rendered: 'Deploy web to stage' }),
+    );
+    component.form.controls.body.setValue('Deploy {{service}} to {{environment}}');
+
+    component['reconcileVariableForm']();
+    component.variableForm.controls['service'].setValue('api');
+    component.variableForm.controls['environment'].setValue('prod');
+    component.generatePreview();
+
+    component.variableForm.controls['service'].setValue('web');
+    component.variableForm.controls['environment'].setValue('stage');
+    component.generatePreview();
+
+    expect(api.generateNote.calls.argsFor(1)).toEqual([3, {
+      service: 'web',
+      environment: 'stage',
+    }]);
+    expect(component.generatedMarkdown()).toBe('Deploy web to stage');
   });
 
   it('should call updateNote when saving an existing note', () => {
@@ -299,6 +355,7 @@ describe('NoteEditorComponent - loading signal', () => {
       'getTags',
       'createNote',
       'updateNote',
+      'generateNote',
       'createVersion',
       'deleteNote',
     ]);
@@ -343,6 +400,7 @@ describe('NoteEditorComponent - invalid edit route', () => {
       'getTags',
       'createNote',
       'updateNote',
+      'generateNote',
       'createVersion',
       'deleteNote',
     ]);
