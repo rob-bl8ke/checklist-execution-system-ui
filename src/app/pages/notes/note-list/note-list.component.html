@@ -1,0 +1,173 @@
+<div class="max-w-4xl mx-auto space-y-6">
+  <header class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div>
+      <h1 class="text-2xl font-semibold text-gray-900">Notes</h1>
+      <p class="mt-2 text-sm text-gray-600">
+        Search your notes, narrow by tags, and jump straight into editing.
+      </p>
+    </div>
+
+    <button
+      type="button"
+      class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+      (click)="createNote()"
+    >
+      + Create Note
+    </button>
+  </header>
+
+  <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+    <div class="space-y-4">
+      <div>
+        <label for="note-search" class="mb-2 block text-sm font-medium text-gray-700">
+          Search notes
+        </label>
+        <input
+          id="note-search"
+          type="search"
+          class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+          placeholder="Search by title or content"
+          [formControl]="searchControl"
+        />
+      </div>
+
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div class="space-y-2">
+          <div class="flex items-center gap-2">
+            <h2 class="text-sm font-medium text-gray-700">Tags</h2>
+            @if (!loading() && availableTags().length === 0) {
+              <span class="text-xs text-gray-400">No tags available yet.</span>
+            }
+          </div>
+
+          <div class="flex flex-wrap gap-2">
+            @for (tag of availableTags(); track tag) {
+              <button
+                type="button"
+                class="rounded-full border px-3 py-1 text-sm transition-colors"
+                [class.border-blue-600]="isTagActive(tag)"
+                [class.bg-blue-50]="isTagActive(tag)"
+                [class.text-blue-700]="isTagActive(tag)"
+                [class.border-gray-200]="!isTagActive(tag)"
+                [class.bg-white]="!isTagActive(tag)"
+                [class.text-gray-600]="!isTagActive(tag)"
+                (click)="toggleTag(tag)"
+              >
+                {{ tag }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="flex flex-col gap-2">
+          <span class="text-sm font-medium text-gray-700">Match mode</span>
+          <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
+            <button
+              type="button"
+              class="rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
+              [class.bg-white]="tagMode() === 'any'"
+              [class.text-blue-700]="tagMode() === 'any'"
+              [class.shadow-sm]="tagMode() === 'any'"
+              [class.text-gray-600]="tagMode() !== 'any'"
+              (click)="setTagMode('any')"
+            >
+              OR
+            </button>
+            <button
+              type="button"
+              class="rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
+              [class.bg-white]="tagMode() === 'all'"
+              [class.text-blue-700]="tagMode() === 'all'"
+              [class.shadow-sm]="tagMode() === 'all'"
+              [class.text-gray-600]="tagMode() !== 'all'"
+              (click)="setTagMode('all')"
+            >
+              AND
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  @if (loading()) {
+    <app-loading-spinner label="Loading notes…" />
+  } @else if (error()) {
+    <p class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      {{ error() }}
+    </p>
+  } @else if (notes().length === 0) {
+    <section class="rounded-xl border border-dashed border-gray-300 bg-white px-6 py-4 shadow-sm">
+      <app-empty-state [message]="emptyMessage()" />
+    </section>
+  } @else {
+    <section class="space-y-4">
+      <div class="flex flex-col gap-2 text-sm text-gray-500 sm:flex-row sm:items-center sm:justify-between">
+        <span>
+          Showing {{ showingFrom() }}-{{ showingTo() }} of {{ total() }} notes
+        </span>
+        <span>Page {{ page() }}</span>
+      </div>
+
+      <ul class="space-y-3">
+        @for (note of notes(); track note.id) {
+          <li>
+            <button
+              type="button"
+              class="note-card w-full rounded-xl border border-gray-200 bg-white p-5 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
+              (click)="openNote(note.id)"
+            >
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h2 class="text-base font-semibold text-gray-900">{{ note.title }}</h2>
+                    @if (note.aiEnabled) {
+                      <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                        AI enabled
+                      </span>
+                    }
+                  </div>
+                  <p class="mt-2 text-sm leading-6 text-gray-600">{{ noteSummary(note) }}</p>
+                </div>
+
+                <div class="text-xs text-gray-400">
+                  Updated {{ note.updatedAt || note.createdAt }}
+                </div>
+              </div>
+
+              @if (note.tags?.length) {
+                <div class="mt-4 flex flex-wrap gap-2">
+                  @for (tag of note.tags; track tag.id) {
+                    <span class="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">
+                      {{ tag.tag }}
+                    </span>
+                  }
+                </div>
+              }
+            </button>
+          </li>
+        }
+      </ul>
+
+      <div class="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+        <button
+          type="button"
+          class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          [disabled]="!hasPreviousPage()"
+          (click)="previousPage()"
+        >
+          Previous
+        </button>
+
+        <button
+          type="button"
+          class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-400 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          [disabled]="!hasNextPage()"
+          (click)="nextPage()"
+        >
+          Next
+        </button>
+      </div>
+    </section>
+  }
+</div>

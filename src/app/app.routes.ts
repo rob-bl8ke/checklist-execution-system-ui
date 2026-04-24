@@ -49,6 +49,16 @@ export const routes: Routes = [
       import('./pages/notes/note-list/note-list.component').then((m) => m.NoteListComponent),
   },
   {
+    path: 'notes/new',
+    loadComponent: () =>
+      import('./pages/notes/note-editor/note-editor.component').then((m) => m.NoteEditorComponent),
+  },
+  {
+    path: 'notes/:id/edit',
+    loadComponent: () =>
+      import('./pages/notes/note-editor/note-editor.component').then((m) => m.NoteEditorComponent),
+  },
+  {
     path: 'reminders',
     loadComponent: () =>
       import('./pages/reminders/reminders.component').then((m) => m.RemindersComponent),
