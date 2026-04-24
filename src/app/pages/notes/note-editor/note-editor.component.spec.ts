@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { provideMarkdown } from 'ngx-markdown';
 
 import { NoteEditorComponent } from './note-editor.component';
@@ -105,6 +105,18 @@ describe('NoteEditorComponent - create mode', () => {
     expect(component.selectedTags()).toEqual([]);
   });
 
+  it('should keep other form fields intact when tags change', () => {
+    component.form.controls.title.setValue('Stable title');
+    component.form.controls.body.setValue('Stable body');
+
+    component.tagInput.setValue('release');
+    component.addTagFromInput();
+    component.removeTag('release');
+
+    expect(component.form.controls.title.value).toBe('Stable title');
+    expect(component.form.controls.body.value).toBe('Stable body');
+  });
+
   it('should filter autocomplete suggestions based on tag input and selected tags', () => {
     component.selectedTags.set(['ops']);
     component.tagInput.setValue('re');
@@ -138,10 +150,33 @@ describe('NoteEditorComponent - create mode', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/notes', MOCK_NOTE.id, 'edit'], { replaceUrl: true });
   });
 
+  it('should mark the editor dirty when form or tag state changes and reset after save', () => {
+    api.createNote.and.returnValue(of(MOCK_NOTE));
+    component.form.controls.title.setValue('Release checklist');
+    component.tagInput.setValue('ops');
+    component.addTagFromInput();
+
+    expect(component.isDirty()).toBeTrue();
+
+    component.save();
+
+    expect(component.isDirty()).toBeFalse();
+  });
+
   it('should navigate back to the notes list', () => {
     component.goBack();
 
     expect(router.navigate).toHaveBeenCalledWith(['/notes']);
+  });
+
+  it('should confirm before navigating away when the editor is dirty', () => {
+    const confirmSpy = spyOn(window, 'confirm').and.returnValue(false);
+    component.form.controls.title.setValue('Unsaved change');
+
+    component.goBack();
+
+    expect(confirmSpy).toHaveBeenCalledWith('Discard unsaved note changes?');
+    expect(router.navigate).not.toHaveBeenCalled();
   });
 });
 
@@ -184,6 +219,7 @@ describe('NoteEditorComponent - edit mode', () => {
     expect(component.form.controls.title.value).toBe(MOCK_NOTE.title);
     expect(component.selectedTags()).toEqual(['ops', 'release']);
     expect(component.showDelimiters()).toBeTrue();
+    expect(component.isDirty()).toBeFalse();
   });
 
   it('should call updateNote when saving an existing note', () => {
@@ -246,6 +282,52 @@ describe('NoteEditorComponent - edit mode', () => {
     api.updateNote.and.returnValue(throwError(() => new Error('fail')));
     component.save();
     expect(component.saveError()).toBe('Failed to save note.');
+  });
+});
+
+describe('NoteEditorComponent - loading signal', () => {
+  let fixture: ComponentFixture<NoteEditorComponent>;
+  let component: NoteEditorComponent;
+  let api: jasmine.SpyObj<NotesApiService>;
+  let router: jasmine.SpyObj<Router>;
+  let noteSubject: Subject<Note>;
+
+  beforeEach(async () => {
+    noteSubject = new Subject<Note>();
+    api = jasmine.createSpyObj('NotesApiService', [
+      'getNote',
+      'getTags',
+      'createNote',
+      'updateNote',
+      'createVersion',
+      'deleteNote',
+    ]);
+    router = jasmine.createSpyObj('Router', ['navigate']);
+    api.getTags.and.returnValue(of(['ops', 'release', 'research']));
+    api.getNote.and.returnValue(noteSubject.asObservable());
+
+    await TestBed.configureTestingModule({
+      imports: [NoteEditorComponent],
+      providers: [
+        { provide: NotesApiService, useValue: api },
+        { provide: Router, useValue: router },
+        { provide: ActivatedRoute, useValue: makeRoute('3') },
+        provideMarkdown(),
+      ],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(NoteEditorComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  it('should set loading true during note fetch and false after completion', () => {
+    expect(component.loading()).toBeTrue();
+
+    noteSubject.next(MOCK_NOTE);
+    noteSubject.complete();
+
+    expect(component.loading()).toBeFalse();
   });
 });
 

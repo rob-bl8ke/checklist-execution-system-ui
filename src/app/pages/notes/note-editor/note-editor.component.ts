@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  HostListener,
   computed,
   inject,
   OnInit,
@@ -40,6 +41,21 @@ function delimiterPairValidator(control: AbstractControl): ValidationErrors | nu
     ? { delimiterPair: true }
     : null;
 }
+
+type NoteEditorFormValue = {
+  title: string;
+  body: string;
+  variablePrefix: string;
+  variableSuffix: string;
+  aiEnabled: boolean;
+  aiProviderKey: AiProviderKey | '';
+  aiModel: string;
+  aiPrompt: string;
+};
+
+type NoteEditorSnapshot = NoteEditorFormValue & {
+  tags: string[];
+};
 
 @Component({
   selector: 'app-note-editor',
@@ -94,6 +110,16 @@ export class NoteEditorComponent implements OnInit {
   readonly noteId = signal<number | null>(null);
   readonly isCreateMode = computed(() => this.noteId() === null);
   readonly showDelimiters = signal(false);
+  readonly formRawValue = signal<NoteEditorFormValue>(this.form.getRawValue());
+  readonly initialSnapshot = signal<NoteEditorSnapshot>(
+    this.createSnapshot(this.form.getRawValue(), this.selectedTags()),
+  );
+  readonly isDirty = computed(() =>
+    !this.areSnapshotsEqual(
+      this.initialSnapshot(),
+      this.createSnapshot(this.formRawValue(), this.selectedTags()),
+    ),
+  );
 
   readonly tagInputValue = toSignal(
     this.tagInput.valueChanges.pipe(startWith(this.tagInput.value)),
@@ -122,6 +148,12 @@ export class NoteEditorComponent implements OnInit {
       this.loadNote(Number(rawId));
     }
 
+    this.form.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        this.formRawValue.set(this.form.getRawValue());
+      });
+
     this.form.controls.aiEnabled.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((enabled) => {
@@ -142,15 +174,27 @@ export class NoteEditorComponent implements OnInit {
             { emitEvent: false },
           );
         }
+        this.formRawValue.set(this.form.getRawValue());
       });
 
     if (!this.form.controls.aiEnabled.value) {
       this.form.controls.aiProviderKey.disable({ emitEvent: false });
       this.form.controls.aiModel.disable({ emitEvent: false });
       this.form.controls.aiPrompt.disable({ emitEvent: false });
+      this.formRawValue.set(this.form.getRawValue());
     }
 
     this.loadTags();
+  }
+
+  @HostListener('window:beforeunload', ['$event'])
+  onBeforeUnload(event: BeforeUnloadEvent): void {
+    if (!this.isDirty() || this.saving() || this.deleting()) {
+      return;
+    }
+
+    event.preventDefault();
+    event.returnValue = '';
   }
 
   addTagFromInput(): void {
@@ -267,6 +311,10 @@ export class NoteEditorComponent implements OnInit {
   }
 
   goBack(): void {
+    if (this.isDirty() && !window.confirm('Discard unsaved note changes?')) {
+      return;
+    }
+
     void this.router.navigate(['/notes']);
   }
 
@@ -314,6 +362,7 @@ export class NoteEditorComponent implements OnInit {
       },
       { emitEvent: false },
     );
+    this.formRawValue.set(this.form.getRawValue());
     if (note.aiEnabled) {
       this.form.controls.aiProviderKey.enable({ emitEvent: false });
       this.form.controls.aiModel.enable({ emitEvent: false });
@@ -325,6 +374,7 @@ export class NoteEditorComponent implements OnInit {
     }
     this.selectedTags.set(note.tags?.map((tag) => tag.tag) ?? []);
     this.showDelimiters.set(!!(note.variablePrefix || note.variableSuffix));
+    this.resetDirtySnapshot();
   }
 
   private buildDto() {
@@ -343,6 +393,25 @@ export class NoteEditorComponent implements OnInit {
       aiModel: aiEnabled ? this.form.controls.aiModel.value.trim() || null : null,
       aiPrompt: aiEnabled ? this.form.controls.aiPrompt.value.trim() || null : null,
     };
+  }
+
+  private resetDirtySnapshot(): void {
+    this.formRawValue.set(this.form.getRawValue());
+    this.initialSnapshot.set(this.createSnapshot(this.formRawValue(), this.selectedTags()));
+  }
+
+  private createSnapshot(
+    formValue: NoteEditorFormValue,
+    tags: string[],
+  ): NoteEditorSnapshot {
+    return {
+      ...formValue,
+      tags: [...tags],
+    };
+  }
+
+  private areSnapshotsEqual(left: NoteEditorSnapshot, right: NoteEditorSnapshot): boolean {
+    return JSON.stringify(left) === JSON.stringify(right);
   }
 
   private normalizeTag(value: string): string {
