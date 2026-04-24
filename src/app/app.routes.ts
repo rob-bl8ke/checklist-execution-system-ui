@@ -44,6 +44,11 @@ export const routes: Routes = [
       import('./pages/todos/todo-list/todo-list.component').then((m) => m.TodoListComponent),
   },
   {
+    path: 'notes',
+    loadComponent: () =>
+      import('./pages/notes/note-list/note-list.component').then((m) => m.NoteListComponent),
+  },
+  {
     path: 'reminders',
     loadComponent: () =>
       import('./pages/reminders/reminders.component').then((m) => m.RemindersComponent),
