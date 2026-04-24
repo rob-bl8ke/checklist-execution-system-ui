@@ -1,0 +1,183 @@
+<section class="flex h-full min-h-[32rem] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+  <header class="border-b border-gray-200 px-5 py-4">
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        <h2 class="text-lg font-semibold text-gray-900">AI Assistant</h2>
+        <p class="mt-1 text-sm text-gray-500">
+          Chat, run preset actions, and inspect proposal history for this target.
+        </p>
+      </div>
+
+      @if (assistant.session()) {
+        <button
+          type="button"
+          class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          [disabled]="assistant.loading()"
+          (click)="clearHistory()"
+        >
+          Clear history
+        </button>
+      }
+    </div>
+
+    <div class="mt-4 flex flex-wrap gap-2 text-xs text-gray-600">
+      @if (assistant.session(); as session) {
+        <span class="rounded-full bg-gray-100 px-3 py-1 font-medium">
+          Provider: {{ assistant.providerInfo()?.providerKey || session.providerKey }}
+        </span>
+        <span class="rounded-full bg-gray-100 px-3 py-1 font-medium">
+          Model: {{ session.model || 'Default' }}
+        </span>
+      } @else if (assistant.defaultProviderKey()) {
+        <span class="rounded-full bg-gray-100 px-3 py-1 font-medium">
+          Default provider: {{ assistant.defaultProviderKey() }}
+        </span>
+      }
+
+      @if (assistant.capabilities(); as capabilities) {
+        <span class="rounded-full bg-emerald-50 px-3 py-1 font-medium text-emerald-700">
+          Structured proposals: {{ capabilities.supportsStructuredProposal ? 'Yes' : 'No' }}
+        </span>
+      }
+    </div>
+  </header>
+
+  @if (assistant.loading()) {
+    <div class="border-b border-gray-200 px-5 py-3">
+      <app-loading-spinner label="AI assistant working" />
+    </div>
+  }
+
+  @if (assistant.error()) {
+    <div class="border-b border-red-200 bg-red-50 px-5 py-3 text-sm text-red-700">
+      {{ assistant.error() }}
+    </div>
+  }
+
+  <div class="border-b border-gray-200 px-5 py-4">
+    <div class="flex flex-wrap gap-2">
+      @for (action of presetActions; track action.key) {
+        <button
+          type="button"
+          class="rounded-full border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          [disabled]="assistant.loading() || !targetType || targetId === null"
+          (click)="runAction(action.key)"
+        >
+          {{ action.label }}
+        </button>
+      }
+    </div>
+  </div>
+
+  <div class="flex-1 space-y-5 overflow-y-auto px-5 py-4">
+    <section class="space-y-3">
+      <div class="flex items-center justify-between gap-3">
+        <h3 class="text-sm font-semibold uppercase tracking-[0.16em] text-gray-500">Conversation</h3>
+        <span class="text-xs text-gray-400">{{ assistant.messages().length }} messages</span>
+      </div>
+
+      @if (assistant.messages().length === 0) {
+        <div class="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-sm text-gray-500">
+          No AI session exists yet. Send a message or run a preset action to start one.
+        </div>
+      } @else {
+        <div class="space-y-3">
+          @for (message of assistant.messages(); track message.id) {
+            <article class="rounded-xl border px-4 py-3" [class]="messageRoleClass(message.role)">
+              <div class="mb-2 flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.14em]">
+                <span>{{ message.role }}</span>
+                @if (message.presetActionKey) {
+                  <span>{{ message.presetActionKey }}</span>
+                }
+              </div>
+              <p class="whitespace-pre-wrap text-sm leading-6">{{ message.content }}</p>
+            </article>
+          }
+        </div>
+      }
+    </section>
+
+    <section class="space-y-3">
+      <div class="flex items-center justify-between gap-3">
+        <h3 class="text-sm font-semibold uppercase tracking-[0.16em] text-gray-500">Pending Proposals</h3>
+        <span class="text-xs text-gray-400">{{ pendingProposals().length }} pending</span>
+      </div>
+
+      @if (assistant.proposals().length === 0) {
+        <div class="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-sm text-gray-500">
+          Proposals from AI responses will appear here.
+        </div>
+      } @else {
+        <div class="space-y-3">
+          @for (proposal of assistant.proposals(); track proposal.id) {
+            <article class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h4 class="text-sm font-semibold text-gray-900">{{ proposal.proposalType }}</h4>
+                  <p class="text-xs text-gray-500">Field: {{ proposal.fieldName }}</p>
+                </div>
+                <span
+                  class="rounded-full px-3 py-1 text-xs font-semibold"
+                  [class]="proposal.status === 'PENDING' ? 'bg-amber-100 text-amber-800' : 'bg-gray-200 text-gray-700'"
+                >
+                  {{ proposal.status }}
+                </span>
+              </div>
+
+              @if (proposal.rationale) {
+                <p class="mt-3 text-sm leading-6 text-gray-700">{{ proposal.rationale }}</p>
+              }
+
+              <div class="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  class="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  [disabled]="assistant.loading() || proposal.status !== 'PENDING'"
+                  (click)="applyProposal(proposal.id)"
+                >
+                  Apply
+                </button>
+                <button
+                  type="button"
+                  class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  [disabled]="assistant.loading() || (proposal.status !== 'APPLIED' && proposal.status !== 'PENDING')"
+                  (click)="revertProposal(proposal.id)"
+                >
+                  Revert
+                </button>
+              </div>
+            </article>
+          }
+        </div>
+      }
+    </section>
+  </div>
+
+  <div class="border-t border-gray-200 px-5 py-4">
+    <label class="mb-2 block text-sm font-medium text-gray-700" for="ai-assistant-message">
+      Message
+    </label>
+    <textarea
+      id="ai-assistant-message"
+      class="min-h-28 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition focus:ring-2 focus:ring-blue-200"
+      [ngModel]="draftMessage()"
+      (ngModelChange)="updateDraftMessage($event)"
+      placeholder="Ask the assistant to improve, review, or explain this content"
+    ></textarea>
+
+    <div class="mt-3 flex items-center justify-between gap-3">
+      <p class="text-xs text-gray-500">
+        Conversations stay scoped to this target and proposals must be applied explicitly.
+      </p>
+
+      <button
+        type="button"
+        class="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+        [disabled]="assistant.loading() || !targetType || targetId === null || !draftMessage().trim()"
+        (click)="sendMessage()"
+      >
+        Send
+      </button>
+    </div>
+  </div>
+</section>
