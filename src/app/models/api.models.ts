@@ -216,6 +216,214 @@ export interface UpdateReminderOccurrenceDto {
 }
 
 // ---------------------------------------------------------------------------
+// Notes
+// ---------------------------------------------------------------------------
+
+export type AiProviderKey =
+  | 'anthropic-api'
+  | 'openai-api'
+  | 'google-api'
+  | 'claude-code-cli'
+  | 'copilot-cli';
+
+export interface NoteTag {
+  id: number;
+  noteId: number;
+  tag: string;
+}
+
+export interface Note {
+  id: number;
+  title: string;
+  body: string | null;
+  variablePrefix: string | null;
+  variableSuffix: string | null;
+  aiEnabled: boolean;
+  aiProviderKey: AiProviderKey | null;
+  aiModel: string | null;
+  aiPrompt: string | null;
+  createdAt: string;
+  updatedAt: string | null;
+  tags?: NoteTag[];
+}
+
+export interface NoteVersion {
+  id: number;
+  noteId: number;
+  title: string;
+  body: string | null;
+  versionNumber: number;
+  createdAt: string;
+}
+
+export interface CreateNoteDto {
+  title: string;
+  body?: string;
+  tags?: string[];
+  variablePrefix?: string | null;
+  variableSuffix?: string | null;
+  aiEnabled?: boolean;
+  aiProviderKey?: AiProviderKey | null;
+  aiModel?: string | null;
+  aiPrompt?: string | null;
+}
+
+export interface UpdateNoteDto {
+  title?: string;
+  body?: string;
+  tags?: string[];
+  variablePrefix?: string | null;
+  variableSuffix?: string | null;
+  aiEnabled?: boolean;
+  aiProviderKey?: AiProviderKey | null;
+  aiModel?: string | null;
+  aiPrompt?: string | null;
+}
+
+export interface GenerateNoteDto {
+  variables?: Record<string, string>;
+}
+
+export interface CreateNoteVersionDto {
+  label?: string;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+// ---------------------------------------------------------------------------
+// AI
+// ---------------------------------------------------------------------------
+
+export type AiTransport = 'api' | 'cli';
+export type AiMessageRole = 'USER' | 'ASSISTANT' | 'SYSTEM';
+export type AiProposalStatus = 'PENDING' | 'APPLIED' | 'REJECTED' | 'REVERTED';
+export type AiFinishReason = 'STOP' | 'LENGTH' | 'ERROR' | 'UNSUPPORTED';
+export type AiExpectedOutput = 'ADVICE_ONLY' | 'BODY_PROPOSAL_OR_ADVICE';
+
+export interface SendAiMessageDto {
+  message: string;
+  providerKey?: AiProviderKey;
+  model?: string;
+  expectedOutput?: AiExpectedOutput;
+}
+
+export interface RunAiActionDto {
+  providerKey?: AiProviderKey;
+  model?: string;
+  userInstruction?: string;
+  expectedOutput?: AiExpectedOutput;
+}
+
+export interface AiCapabilitiesSummary {
+  providerKey: AiProviderKey;
+  available: boolean;
+  transport: AiTransport;
+  supportsChat: boolean;
+  supportsPresetActions: boolean;
+  supportsStructuredProposal: boolean;
+  supportsStreaming: boolean;
+  unavailableReason?: string;
+}
+
+export interface AiSession {
+  id: number;
+  targetType: string;
+  targetId: number;
+  providerKey: string;
+  model: string | null;
+  createdAt: string;
+  updatedAt: string | null;
+  clearedAt: string | null;
+}
+
+export interface AiMessage {
+  id: number;
+  role: AiMessageRole;
+  content: string;
+  presetActionKey: string | null;
+  createdAt: string;
+}
+
+export interface AiProposal {
+  id: number;
+  status: AiProposalStatus;
+  proposalType: string;
+  fieldName: string;
+  rationale: string | null;
+  confidence: number | null;
+  createdAt: string;
+  appliedAt: string | null;
+  revertedAt: string | null;
+}
+
+export interface AiInteractionProposal {
+  id?: number;
+  proposalType: string;
+  fieldName: string;
+  currentValue: string;
+  proposedValue: string;
+  rationale: string | null;
+  confidence: number | null;
+  status: AiProposalStatus;
+}
+
+export interface AiSessionResponse {
+  session: AiSession;
+  messages: AiMessage[];
+  proposals: AiProposal[];
+  capabilitiesSummary: AiCapabilitiesSummary;
+}
+
+export interface AiInteractionResponse {
+  session: AiSession;
+  assistantMessage: string;
+  proposal: AiInteractionProposal | null;
+  finishReason: AiFinishReason;
+  capabilitiesSummary: AiCapabilitiesSummary;
+}
+
+export interface AiProposalMutationResult {
+  id: number;
+  status: AiProposalStatus;
+  appliedAt: string | null;
+  revertedAt: string | null;
+}
+
+export interface AiNoteVersionSnapshot {
+  id: number;
+  versionNumber: number;
+  createdAt: string;
+}
+
+export interface AiProposalMutationResponse {
+  proposal: AiProposalMutationResult;
+  target: { targetType: 'NOTE'; targetId: number };
+  noteVersion?: AiNoteVersionSnapshot;
+}
+
+export interface AiProviderStatus {
+  providerKey: AiProviderKey;
+  available: boolean;
+  transport: AiTransport;
+  supportsChat: boolean;
+  supportsPresetActions: boolean;
+  supportsStructuredProposal: boolean;
+  supportsStreaming: boolean;
+  supportedModels: string[];
+  unavailableReason?: string;
+}
+
+export interface AiProviderStatusResponse {
+  providers: AiProviderStatus[];
+  defaultProviderKey?: AiProviderKey;
+}
+
+// ---------------------------------------------------------------------------
 // Dashboard
 // ---------------------------------------------------------------------------
 
