@@ -82,6 +82,16 @@ describe('AiAssistantPanelComponent', () => {
     expect(service.sendMessage).toHaveBeenCalledWith('NOTE', 3, { message: 'Review this' });
   });
 
+  it('should run preset actions using the current target inputs', () => {
+    const buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
+    const improveNoteButton = buttons.find((button) => button.textContent?.trim() === 'Improve note');
+    expect(improveNoteButton).toBeDefined();
+
+    improveNoteButton!.click();
+
+    expect(service.runAction).toHaveBeenCalledWith('NOTE', 3, 'improve-note');
+  });
+
   it('should render message history, proposal cards, and provider info', () => {
     service.session.set({
       id: 9,

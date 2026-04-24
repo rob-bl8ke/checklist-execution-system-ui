@@ -1,10 +1,12 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 import { provideMarkdown } from 'ngx-markdown';
 
 import { NoteEditorComponent } from './note-editor.component';
 import { NotesApiService } from '../../../services/notes-api.service';
+import { AiAssistantService } from '../../../services/ai-assistant.service';
 import { Note } from '../../../models/api.models';
 
 const MOCK_NOTE: Note = {
@@ -31,11 +33,37 @@ function makeRoute(id: string | null) {
   };
 }
 
+function createAiAssistantServiceSpy() {
+  return Object.assign(
+    jasmine.createSpyObj<AiAssistantService>('AiAssistantService', [
+      'loadProviderStatus',
+      'loadSession',
+      'sendMessage',
+      'runAction',
+      'clearSession',
+      'applyProposal',
+      'revertProposal',
+    ]),
+    {
+      session: signal(null),
+      messages: signal([]),
+      proposals: signal([]),
+      loading: signal(false),
+      capabilities: signal(null),
+      providers: signal([]),
+      defaultProviderKey: signal('openai-api'),
+      error: signal(null),
+      providerInfo: signal(null),
+    },
+  );
+}
+
 describe('NoteEditorComponent - create mode', () => {
   let fixture: ComponentFixture<NoteEditorComponent>;
   let component: NoteEditorComponent;
   let api: jasmine.SpyObj<NotesApiService>;
   let router: jasmine.SpyObj<Router>;
+  let assistant: ReturnType<typeof createAiAssistantServiceSpy>;
 
   beforeEach(async () => {
     api = jasmine.createSpyObj('NotesApiService', [
@@ -48,12 +76,14 @@ describe('NoteEditorComponent - create mode', () => {
       'deleteNote',
     ]);
     router = jasmine.createSpyObj('Router', ['navigate']);
+    assistant = createAiAssistantServiceSpy();
     api.getTags.and.returnValue(of(['ops', 'release', 'research']));
 
     await TestBed.configureTestingModule({
       imports: [NoteEditorComponent],
       providers: [
         { provide: NotesApiService, useValue: api },
+        { provide: AiAssistantService, useValue: assistant },
         { provide: Router, useValue: router },
         { provide: ActivatedRoute, useValue: makeRoute(null) },
         provideMarkdown(),
@@ -81,6 +111,11 @@ describe('NoteEditorComponent - create mode', () => {
 
   it('should not preload a note in create mode', () => {
     expect(api.getNote).not.toHaveBeenCalled();
+  });
+
+  it('should not render the AI assistant panel in create mode', () => {
+    expect(fixture.nativeElement.querySelector('app-ai-assistant-panel')).toBeNull();
+    expect(assistant.loadSession).not.toHaveBeenCalled();
   });
 
   it('should not save when title is empty', () => {
@@ -186,6 +221,7 @@ describe('NoteEditorComponent - edit mode', () => {
   let component: NoteEditorComponent;
   let api: jasmine.SpyObj<NotesApiService>;
   let router: jasmine.SpyObj<Router>;
+  let assistant: ReturnType<typeof createAiAssistantServiceSpy>;
 
   beforeEach(async () => {
     api = jasmine.createSpyObj('NotesApiService', [
@@ -198,6 +234,7 @@ describe('NoteEditorComponent - edit mode', () => {
       'deleteNote',
     ]);
     router = jasmine.createSpyObj('Router', ['navigate']);
+    assistant = createAiAssistantServiceSpy();
     api.getTags.and.returnValue(of(['ops', 'release', 'research']));
     api.getNote.and.returnValue(of(MOCK_NOTE));
 
@@ -205,6 +242,7 @@ describe('NoteEditorComponent - edit mode', () => {
       imports: [NoteEditorComponent],
       providers: [
         { provide: NotesApiService, useValue: api },
+        { provide: AiAssistantService, useValue: assistant },
         { provide: Router, useValue: router },
         { provide: ActivatedRoute, useValue: makeRoute('3') },
         provideMarkdown(),
@@ -222,6 +260,19 @@ describe('NoteEditorComponent - edit mode', () => {
     expect(component.selectedTags()).toEqual(['ops', 'release']);
     expect(component.showDelimiters()).toBeTrue();
     expect(component.isDirty()).toBeFalse();
+  });
+
+  it('should render the AI assistant panel and load the persisted session when AI is enabled', () => {
+    expect(fixture.nativeElement.querySelector('app-ai-assistant-panel')).not.toBeNull();
+    expect(assistant.loadProviderStatus).toHaveBeenCalled();
+    expect(assistant.loadSession).toHaveBeenCalledWith('NOTE', 3);
+  });
+
+  it('should hide the AI assistant panel when AI is disabled', () => {
+    component.form.controls.aiEnabled.setValue(false);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-ai-assistant-panel')).toBeNull();
   });
 
   it('should extract variables from the note body using the current delimiters', () => {
@@ -347,6 +398,7 @@ describe('NoteEditorComponent - loading signal', () => {
   let api: jasmine.SpyObj<NotesApiService>;
   let router: jasmine.SpyObj<Router>;
   let noteSubject: Subject<Note>;
+  let assistant: ReturnType<typeof createAiAssistantServiceSpy>;
 
   beforeEach(async () => {
     noteSubject = new Subject<Note>();
@@ -360,6 +412,7 @@ describe('NoteEditorComponent - loading signal', () => {
       'deleteNote',
     ]);
     router = jasmine.createSpyObj('Router', ['navigate']);
+    assistant = createAiAssistantServiceSpy();
     api.getTags.and.returnValue(of(['ops', 'release', 'research']));
     api.getNote.and.returnValue(noteSubject.asObservable());
 
@@ -367,6 +420,7 @@ describe('NoteEditorComponent - loading signal', () => {
       imports: [NoteEditorComponent],
       providers: [
         { provide: NotesApiService, useValue: api },
+        { provide: AiAssistantService, useValue: assistant },
         { provide: Router, useValue: router },
         { provide: ActivatedRoute, useValue: makeRoute('3') },
         provideMarkdown(),
@@ -393,6 +447,7 @@ describe('NoteEditorComponent - invalid edit route', () => {
   let component: NoteEditorComponent;
   let api: jasmine.SpyObj<NotesApiService>;
   let router: jasmine.SpyObj<Router>;
+  let assistant: ReturnType<typeof createAiAssistantServiceSpy>;
 
   beforeEach(async () => {
     api = jasmine.createSpyObj('NotesApiService', [
@@ -405,6 +460,7 @@ describe('NoteEditorComponent - invalid edit route', () => {
       'deleteNote',
     ]);
     router = jasmine.createSpyObj('Router', ['navigate']);
+    assistant = createAiAssistantServiceSpy();
     api.getTags.and.returnValue(of(['ops', 'release', 'research']));
     api.getNote.and.returnValue(throwError(() => new Error('not found')));
 
@@ -412,6 +468,7 @@ describe('NoteEditorComponent - invalid edit route', () => {
       imports: [NoteEditorComponent],
       providers: [
         { provide: NotesApiService, useValue: api },
+        { provide: AiAssistantService, useValue: assistant },
         { provide: Router, useValue: router },
         { provide: ActivatedRoute, useValue: makeRoute('99999') },
         provideMarkdown(),

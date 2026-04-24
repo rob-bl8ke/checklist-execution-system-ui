@@ -21,6 +21,7 @@ import {
 import { ActivatedRoute, Router } from '@angular/router';
 import { MarkdownComponent } from 'ngx-markdown';
 import { map, startWith } from 'rxjs';
+import { AiAssistantPanelComponent } from '../../../components/ai-assistant-panel/ai-assistant-panel.component';
 import { ConfirmDialogComponent } from '../../../components/confirm-dialog/confirm-dialog.component';
 import { LoadingSpinnerComponent } from '../../../components/loading-spinner/loading-spinner.component';
 import { AiProviderKey, Note } from '../../../models/api.models';
@@ -62,7 +63,13 @@ type NoteEditorSnapshot = NoteEditorFormValue & {
 @Component({
   selector: 'app-note-editor',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, MarkdownComponent, LoadingSpinnerComponent, ConfirmDialogComponent],
+  imports: [
+    ReactiveFormsModule,
+    MarkdownComponent,
+    LoadingSpinnerComponent,
+    ConfirmDialogComponent,
+    AiAssistantPanelComponent,
+  ],
   templateUrl: './note-editor.component.html',
   styleUrl: './note-editor.component.css',
 })
@@ -152,6 +159,9 @@ export class NoteEditorComponent implements OnInit {
     const suffix = formValue.variableSuffix.trim() || '}}';
     return extractVariables(formValue.body, prefix, suffix);
   });
+  readonly showAiAssistantPanel = computed(
+    () => !this.isCreateMode() && this.noteId() !== null && this.formRawValue().aiEnabled,
+  );
   readonly hasGeneratePanel = computed(() => !this.isCreateMode() && this.variableNames().length > 0);
 
   ngOnInit(): void {
