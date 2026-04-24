@@ -78,6 +78,10 @@ describe('NoteEditorComponent - create mode', () => {
     expect(component.availableTags()).toEqual(['ops', 'release', 'research']);
   });
 
+  it('should not preload a note in create mode', () => {
+    expect(api.getNote).not.toHaveBeenCalled();
+  });
+
   it('should not save when title is empty', () => {
     component.form.controls.title.setValue('');
     component.save();
@@ -132,6 +136,12 @@ describe('NoteEditorComponent - create mode', () => {
       aiProviderKey: 'openai-api',
     }));
     expect(router.navigate).toHaveBeenCalledWith(['/notes', MOCK_NOTE.id, 'edit'], { replaceUrl: true });
+  });
+
+  it('should navigate back to the notes list', () => {
+    component.goBack();
+
+    expect(router.navigate).toHaveBeenCalledWith(['/notes']);
   });
 });
 
@@ -236,5 +246,46 @@ describe('NoteEditorComponent - edit mode', () => {
     api.updateNote.and.returnValue(throwError(() => new Error('fail')));
     component.save();
     expect(component.saveError()).toBe('Failed to save note.');
+  });
+});
+
+describe('NoteEditorComponent - invalid edit route', () => {
+  let fixture: ComponentFixture<NoteEditorComponent>;
+  let component: NoteEditorComponent;
+  let api: jasmine.SpyObj<NotesApiService>;
+  let router: jasmine.SpyObj<Router>;
+
+  beforeEach(async () => {
+    api = jasmine.createSpyObj('NotesApiService', [
+      'getNote',
+      'getTags',
+      'createNote',
+      'updateNote',
+      'createVersion',
+      'deleteNote',
+    ]);
+    router = jasmine.createSpyObj('Router', ['navigate']);
+    api.getTags.and.returnValue(of(['ops', 'release', 'research']));
+    api.getNote.and.returnValue(throwError(() => new Error('not found')));
+
+    await TestBed.configureTestingModule({
+      imports: [NoteEditorComponent],
+      providers: [
+        { provide: NotesApiService, useValue: api },
+        { provide: Router, useValue: router },
+        { provide: ActivatedRoute, useValue: makeRoute('99999') },
+        provideMarkdown(),
+      ],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(NoteEditorComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  it('should show an error state when the note id is invalid', () => {
+    expect(api.getNote).toHaveBeenCalledWith(99999);
+    expect(component.loadError()).toBe('Failed to load note.');
+    expect(component.loading()).toBeFalse();
   });
 });
