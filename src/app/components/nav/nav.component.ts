@@ -42,6 +42,14 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
       </a>
 
       <a
+        routerLink="/notes"
+        routerLinkActive="bg-blue-600"
+        class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+      >
+        <span>📝</span> Notes
+      </a>
+
+      <a
         routerLink="/reminders"
         routerLinkActive="bg-blue-600"
         class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors"
