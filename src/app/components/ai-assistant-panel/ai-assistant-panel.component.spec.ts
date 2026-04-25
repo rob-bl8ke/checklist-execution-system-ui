@@ -29,6 +29,7 @@ describe('AiAssistantPanelComponent', () => {
         'clearSession',
         'applyProposal',
         'revertProposal',
+        'dismissProposal',
       ]),
       {
         session: signal(null),
@@ -40,6 +41,7 @@ describe('AiAssistantPanelComponent', () => {
         defaultProviderKey: signal('openai-api'),
         error: signal(null),
         providerInfo: signal(null),
+        lastMutation: signal(null),
       },
     );
 
@@ -132,6 +134,8 @@ describe('AiAssistantPanelComponent', () => {
         status: 'PENDING',
         proposalType: 'BODY_REWRITE',
         fieldName: 'body',
+        currentValue: 'Before',
+        proposedValue: 'After body from AI',
         rationale: 'This is clearer.',
         confidence: 0.7,
         createdAt: '',
@@ -147,6 +151,7 @@ describe('AiAssistantPanelComponent', () => {
     expect(text).toContain('Hello');
     expect(text).toContain('BODY_REWRITE');
     expect(text).toContain('This is clearer.');
+    expect(text).toContain('After body from AI');
   });
 
   it('should show the loading spinner during AI calls', () => {
@@ -154,5 +159,93 @@ describe('AiAssistantPanelComponent', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('AI assistant working');
+  });
+
+  it('should apply and dismiss pending proposals', () => {
+    service.proposals.set([
+      {
+        id: 7,
+        status: 'PENDING',
+        proposalType: 'BODY_REWRITE',
+        fieldName: 'body',
+        currentValue: 'Before',
+        proposedValue: 'After',
+        rationale: 'Sharper wording.',
+        confidence: 0.8,
+        createdAt: '',
+        appliedAt: null,
+        revertedAt: null,
+      },
+    ]);
+    fixture.detectChanges();
+
+    const buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
+    const applyButton = buttons.find((button) => button.textContent?.trim() === 'Apply');
+    const dismissButton = buttons.find((button) => button.textContent?.trim() === 'Dismiss');
+    expect(applyButton).toBeDefined();
+    expect(dismissButton).toBeDefined();
+
+    applyButton!.click();
+    dismissButton!.click();
+
+    expect(service.applyProposal).toHaveBeenCalledWith(7);
+    expect(service.dismissProposal).toHaveBeenCalledWith(7);
+  });
+
+  it('should show a revert-last button for the most recently applied proposal', () => {
+    service.proposals.set([
+      {
+        id: 5,
+        status: 'APPLIED',
+        proposalType: 'BODY_REWRITE',
+        fieldName: 'body',
+        currentValue: 'Before',
+        proposedValue: 'After',
+        rationale: 'Sharper wording.',
+        confidence: 0.8,
+        createdAt: '',
+        appliedAt: '2026-04-24T12:00:00.000Z',
+        revertedAt: null,
+      },
+      {
+        id: 4,
+        status: 'APPLIED',
+        proposalType: 'BODY_REWRITE',
+        fieldName: 'body',
+        currentValue: 'Older',
+        proposedValue: 'Old applied',
+        rationale: 'Older change.',
+        confidence: 0.6,
+        createdAt: '',
+        appliedAt: '2026-04-24T10:00:00.000Z',
+        revertedAt: null,
+      },
+    ]);
+    fixture.detectChanges();
+
+    const buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
+    const revertButton = buttons.find((button) => button.textContent?.trim() === 'Revert last AI change');
+    expect(revertButton).toBeDefined();
+
+    revertButton!.click();
+
+    expect(service.revertProposal).toHaveBeenCalledWith(5);
+  });
+
+  it('should emit body updates when proposal mutations succeed', () => {
+    let emitted: { body: string; source: 'apply' | 'revert'; proposalId: number } | undefined;
+    component.bodyChanged.subscribe((value) => (emitted = value));
+
+    service.lastMutation.set({ kind: 'apply', proposalId: 7, body: 'Applied body', nonce: 1 });
+    fixture.detectChanges();
+
+    expect(emitted).toEqual({ body: 'Applied body', source: 'apply', proposalId: 7 });
+  });
+
+  it('should display conflict errors without crashing', () => {
+    service.error.set('This proposal could not be applied because the note changed after the proposal was created.');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('This proposal could not be applied because the note changed after the proposal was created.');
   });
 });

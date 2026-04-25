@@ -99,9 +99,20 @@
 
     <section class="space-y-3">
       <div class="flex items-center justify-between gap-3">
-        <h3 class="text-sm font-semibold uppercase tracking-[0.16em] text-gray-500">Pending Proposals</h3>
+        <h3 class="text-sm font-semibold uppercase tracking-[0.16em] text-gray-500">Proposals</h3>
         <span class="text-xs text-gray-400">{{ pendingProposals().length }} pending</span>
       </div>
+
+      @if (lastAppliedProposal(); as appliedProposal) {
+        <button
+          type="button"
+          class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+          [disabled]="assistant.loading()"
+          (click)="revertLastAppliedProposal()"
+        >
+          Revert last AI change
+        </button>
+      }
 
       @if (assistant.proposals().length === 0) {
         <div class="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-sm text-gray-500">
@@ -128,23 +139,44 @@
                 <p class="mt-3 text-sm leading-6 text-gray-700">{{ proposal.rationale }}</p>
               }
 
+              <div class="mt-3 rounded-lg border border-gray-200 bg-white p-3">
+                <span class="block text-xs font-semibold uppercase tracking-[0.14em] text-gray-500">
+                  Proposed body preview
+                </span>
+                <pre class="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-700">{{ proposalPreview(proposal) }}</pre>
+              </div>
+
               <div class="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  class="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  [disabled]="assistant.loading() || proposal.status !== 'PENDING'"
-                  (click)="applyProposal(proposal.id)"
-                >
-                  Apply
-                </button>
-                <button
-                  type="button"
-                  class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  [disabled]="assistant.loading() || (proposal.status !== 'APPLIED' && proposal.status !== 'PENDING')"
-                  (click)="revertProposal(proposal.id)"
-                >
-                  Revert
-                </button>
+                @if (proposal.status === 'PENDING') {
+                  <button
+                    type="button"
+                    class="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    [disabled]="assistant.loading()"
+                    (click)="applyProposal(proposal.id)"
+                  >
+                    Apply
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    [disabled]="assistant.loading()"
+                    (click)="dismissProposal(proposal.id)"
+                  >
+                    Dismiss
+                  </button>
+                } @else if (proposal.status === 'APPLIED') {
+                  <span class="rounded-lg bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-800">
+                    Applied
+                  </span>
+                } @else if (proposal.status === 'REVERTED') {
+                  <span class="rounded-lg bg-gray-200 px-3 py-2 text-sm font-medium text-gray-700">
+                    Reverted
+                  </span>
+                } @else {
+                  <span class="rounded-lg bg-gray-200 px-3 py-2 text-sm font-medium text-gray-700">
+                    Dismissed
+                  </span>
+                }
               </div>
             </article>
           }

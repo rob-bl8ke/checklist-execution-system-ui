@@ -6,6 +6,7 @@ import { environment } from '../../environments/environment';
 import {
   AiCapabilitiesSummary,
   AiInteractionResponse,
+  AiNoteVersionSnapshot,
   AiProposal,
   AiProposalMutationResponse,
   AiProviderKey,
@@ -18,6 +19,14 @@ import {
 } from '../models/api.models';
 
 export type AiAssistantTargetType = 'NOTE';
+
+export type AiAssistantMutation = {
+  kind: 'apply' | 'revert';
+  proposalId: number;
+  body: string;
+  noteVersion?: AiNoteVersionSnapshot;
+  nonce: number;
+};
 
 @Injectable({ providedIn: 'root' })
 export class AiAssistantService {
@@ -32,6 +41,7 @@ export class AiAssistantService {
   readonly providers = signal<AiProviderStatus[]>([]);
   readonly defaultProviderKey = signal<AiProviderKey | null>(null);
   readonly error = signal<string | null>(null);
+  readonly lastMutation = signal<AiAssistantMutation | null>(null);
 
   readonly providerInfo = computed(() => {
     const session = this.session();
@@ -133,39 +143,69 @@ export class AiAssistantService {
   }
 
   applyProposal(proposalId: number): void {
+    const proposal = this.findProposal(proposalId);
     this.loading.set(true);
     this.error.set(null);
 
     this.http
       .post<AiProposalMutationResponse>(`${this.aiBase}/proposals/${proposalId}/apply`, {})
       .subscribe({
-        next: ({ proposal }) => {
-          this.updateProposalStatus(proposal.id, proposal.status);
+        next: (response) => {
+          this.updateProposalStatus(response.proposal.id, response.proposal.status, {
+            appliedAt: response.proposal.appliedAt,
+            revertedAt: response.proposal.revertedAt,
+          });
+          if (proposal) {
+            this.lastMutation.set({
+              kind: 'apply',
+              proposalId: proposal.id,
+              body: proposal.proposedValue,
+              noteVersion: response.noteVersion,
+              nonce: Date.now(),
+            });
+          }
           this.reloadCurrentTarget();
         },
-        error: () => {
+        error: (error: HttpErrorResponse) => {
           this.loading.set(false);
-          this.error.set('Failed to apply AI proposal.');
+          this.error.set(this.getProposalMutationErrorMessage('apply', error));
         },
       });
   }
 
   revertProposal(proposalId: number): void {
+    const proposal = this.findProposal(proposalId);
     this.loading.set(true);
     this.error.set(null);
 
     this.http
       .post<AiProposalMutationResponse>(`${this.aiBase}/proposals/${proposalId}/revert`, {})
       .subscribe({
-        next: ({ proposal }) => {
-          this.updateProposalStatus(proposal.id, proposal.status);
+        next: (response) => {
+          this.updateProposalStatus(response.proposal.id, response.proposal.status, {
+            appliedAt: response.proposal.appliedAt,
+            revertedAt: response.proposal.revertedAt,
+          });
+          if (proposal) {
+            this.lastMutation.set({
+              kind: 'revert',
+              proposalId: proposal.id,
+              body: proposal.currentValue,
+              noteVersion: response.noteVersion,
+              nonce: Date.now(),
+            });
+          }
           this.reloadCurrentTarget();
         },
-        error: () => {
+        error: (error: HttpErrorResponse) => {
           this.loading.set(false);
-          this.error.set('Failed to revert AI proposal.');
+          this.error.set(this.getProposalMutationErrorMessage('revert', error));
         },
       });
+  }
+
+  dismissProposal(proposalId: number): void {
+    this.updateProposalStatus(proposalId, 'REJECTED');
   }
 
   private handleInteractionResponse(
@@ -214,6 +254,8 @@ export class AiAssistantService {
         status: proposal.status,
         proposalType: proposal.proposalType,
         fieldName: proposal.fieldName,
+        currentValue: proposal.currentValue,
+        proposedValue: proposal.proposedValue,
         rationale: proposal.rationale,
         confidence: proposal.confidence,
         createdAt: new Date().toISOString(),
@@ -231,11 +273,41 @@ export class AiAssistantService {
     });
   }
 
-  private updateProposalStatus(proposalId: number, status: AiProposal['status']): void {
+  private findProposal(proposalId: number): AiProposal | undefined {
+    return this.proposals().find((proposal) => proposal.id === proposalId);
+  }
+
+  private updateProposalStatus(
+    proposalId: number,
+    status: AiProposal['status'],
+    overrides?: Pick<AiProposal, 'appliedAt' | 'revertedAt'>,
+  ): void {
     this.proposals.update((existing) =>
       existing.map((proposal) =>
-        proposal.id === proposalId ? { ...proposal, status } : proposal,
+        proposal.id === proposalId
+          ? {
+              ...proposal,
+              status,
+              appliedAt: overrides?.appliedAt ?? proposal.appliedAt,
+              revertedAt: overrides?.revertedAt ?? proposal.revertedAt,
+            }
+          : proposal,
       ),
     );
+  }
+
+  private getProposalMutationErrorMessage(
+    action: 'apply' | 'revert',
+    error: HttpErrorResponse,
+  ): string {
+    if (error.status === 409) {
+      return action === 'apply'
+        ? 'This proposal could not be applied because the note changed after the proposal was created.'
+        : 'This AI change can no longer be reverted because the proposal state is out of date.';
+    }
+
+    return action === 'apply'
+      ? 'Failed to apply AI proposal.'
+      : 'Failed to revert AI proposal.';
   }
 }

@@ -354,6 +354,8 @@ export interface AiProposal {
   status: AiProposalStatus;
   proposalType: string;
   fieldName: string;
+  currentValue: string;
+  proposedValue: string;
   rationale: string | null;
   confidence: number | null;
   createdAt: string;

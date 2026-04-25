@@ -270,6 +270,14 @@ export class NoteEditorComponent implements OnInit {
     });
   }
 
+  handleAssistantBodyChange(event: { body: string; source: 'apply' | 'revert'; proposalId: number }): void {
+    this.form.controls.body.setValue(event.body);
+    this.initialSnapshot.update((snapshot) => ({
+      ...snapshot,
+      body: event.body,
+    }));
+  }
+
   save(): void {
     this.submitted.set(true);
     this.versionMessage.set(null);

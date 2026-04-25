@@ -317,7 +317,11 @@
             </p>
           </div>
 
-          <app-ai-assistant-panel [targetType]="'NOTE'" [targetId]="noteId()!" />
+          <app-ai-assistant-panel
+            [targetType]="'NOTE'"
+            [targetId]="noteId()!"
+            (bodyChanged)="handleAssistantBodyChange($event)"
+          />
         </section>
       }
 

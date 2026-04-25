@@ -2,12 +2,14 @@ import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  effect,
   Input,
   OnChanges,
   OnInit,
   SimpleChanges,
   computed,
   inject,
+  output,
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -30,6 +32,7 @@ export class AiAssistantPanelComponent implements OnInit, OnChanges {
   @Input() targetId: number | null = null;
 
   protected readonly assistant = inject(AiAssistantService);
+  readonly bodyChanged = output<{ body: string; source: 'apply' | 'revert'; proposalId: number }>();
   protected readonly presetActions: ReadonlyArray<PresetAction> = [
     { key: 'improve-note', label: 'Improve note' },
     { key: 'review-code', label: 'Review code' },
@@ -40,6 +43,35 @@ export class AiAssistantPanelComponent implements OnInit, OnChanges {
   protected readonly pendingProposals = computed(() =>
     this.assistant.proposals().filter((proposal) => proposal.status === 'PENDING'),
   );
+  protected readonly lastAppliedProposal = computed(() => {
+    const applied = this.assistant
+      .proposals()
+      .filter((proposal) => proposal.status === 'APPLIED' && proposal.appliedAt);
+    if (applied.length === 0) {
+      return null;
+    }
+
+    return [...applied].sort((left, right) =>
+      (right.appliedAt ?? '').localeCompare(left.appliedAt ?? ''),
+    )[0];
+  });
+  private lastHandledMutationNonce = 0;
+
+  constructor() {
+    effect(() => {
+      const mutation = this.assistant.lastMutation();
+      if (!mutation || mutation.nonce === this.lastHandledMutationNonce) {
+        return;
+      }
+
+      this.lastHandledMutationNonce = mutation.nonce;
+      this.bodyChanged.emit({
+        body: mutation.body,
+        source: mutation.kind,
+        proposalId: mutation.proposalId,
+      });
+    });
+  }
 
   ngOnInit(): void {
     if (this.assistant.providers().length === 0) {
@@ -89,6 +121,28 @@ export class AiAssistantPanelComponent implements OnInit, OnChanges {
 
   protected revertProposal(proposalId: number): void {
     this.assistant.revertProposal(proposalId);
+  }
+
+  protected dismissProposal(proposalId: number): void {
+    this.assistant.dismissProposal(proposalId);
+  }
+
+  protected revertLastAppliedProposal(): void {
+    const proposal = this.lastAppliedProposal();
+    if (!proposal) {
+      return;
+    }
+
+    this.assistant.revertProposal(proposal.id);
+  }
+
+  protected proposalPreview(proposal: { proposedValue: string }): string {
+    const preview = proposal.proposedValue.trim();
+    if (!preview) {
+      return 'No proposal preview available.';
+    }
+
+    return preview.length > 280 ? `${preview.slice(0, 280).trimEnd()}…` : preview;
   }
 
   protected messageRoleClass(role: string): string {

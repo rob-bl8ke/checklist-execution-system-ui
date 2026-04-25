@@ -36,6 +36,8 @@ const MOCK_SESSION_RESPONSE: AiSessionResponse = {
       status: 'PENDING',
       proposalType: 'BODY_REWRITE',
       fieldName: 'body',
+      currentValue: 'Before',
+      proposedValue: 'After',
       rationale: 'Clearer flow.',
       confidence: 0.92,
       createdAt: '',
@@ -142,5 +144,61 @@ describe('AiAssistantService', () => {
 
     expect(service.providers().length).toBe(1);
     expect(service.defaultProviderKey()).toBe('openai-api');
+  });
+
+  it('should publish the applied proposal body after apply succeeds', () => {
+    service.loadSession('NOTE', 3);
+    http.expectOne('http://localhost:3000/api/ai/targets/NOTE/3/session').flush(MOCK_SESSION_RESPONSE);
+
+    service.applyProposal(11);
+
+    http.expectOne('http://localhost:3000/api/ai/proposals/11/apply').flush({
+      proposal: {
+        id: 11,
+        status: 'APPLIED',
+        appliedAt: '2026-04-24T12:00:00.000Z',
+        revertedAt: null,
+      },
+      target: { targetType: 'NOTE', targetId: 3 },
+      noteVersion: { id: 19, versionNumber: 2, createdAt: '2026-04-24T12:00:00.000Z' },
+    });
+
+    expect(service.lastMutation()).toEqual(jasmine.objectContaining({
+      kind: 'apply',
+      proposalId: 11,
+      body: 'After',
+    }));
+
+    http.expectOne('http://localhost:3000/api/ai/targets/NOTE/3/session').flush({
+      ...MOCK_SESSION_RESPONSE,
+      proposals: [{
+        ...MOCK_SESSION_RESPONSE.proposals[0],
+        status: 'APPLIED',
+        appliedAt: '2026-04-24T12:00:00.000Z',
+      }],
+    });
+  });
+
+  it('should surface a user-friendly 409 message when apply conflicts', () => {
+    service.loadSession('NOTE', 3);
+    http.expectOne('http://localhost:3000/api/ai/targets/NOTE/3/session').flush(MOCK_SESSION_RESPONSE);
+
+    service.applyProposal(11);
+
+    http.expectOne('http://localhost:3000/api/ai/proposals/11/apply').flush(
+      { message: 'stale' },
+      { status: 409, statusText: 'Conflict' },
+    );
+
+    expect(service.error()).toBe('This proposal could not be applied because the note changed after the proposal was created.');
+  });
+
+  it('should dismiss a pending proposal locally', () => {
+    service.loadSession('NOTE', 3);
+    http.expectOne('http://localhost:3000/api/ai/targets/NOTE/3/session').flush(MOCK_SESSION_RESPONSE);
+
+    service.dismissProposal(11);
+
+    expect(service.proposals()[0].status).toBe('REJECTED');
   });
 });

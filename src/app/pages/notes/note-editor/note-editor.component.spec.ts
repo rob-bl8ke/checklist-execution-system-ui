@@ -1,9 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
+import { By } from '@angular/platform-browser';
 import { of, Subject, throwError } from 'rxjs';
 import { provideMarkdown } from 'ngx-markdown';
 
+import { AiAssistantPanelComponent } from '../../../components/ai-assistant-panel/ai-assistant-panel.component';
 import { NoteEditorComponent } from './note-editor.component';
 import { NotesApiService } from '../../../services/notes-api.service';
 import { AiAssistantService } from '../../../services/ai-assistant.service';
@@ -43,6 +45,7 @@ function createAiAssistantServiceSpy() {
       'clearSession',
       'applyProposal',
       'revertProposal',
+      'dismissProposal',
     ]),
     {
       session: signal(null),
@@ -54,6 +57,7 @@ function createAiAssistantServiceSpy() {
       defaultProviderKey: signal('openai-api'),
       error: signal(null),
       providerInfo: signal(null),
+      lastMutation: signal(null),
     },
   );
 }
@@ -273,6 +277,23 @@ describe('NoteEditorComponent - edit mode', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('app-ai-assistant-panel')).toBeNull();
+  });
+
+  it('should update the editor body and saved snapshot when the assistant emits an apply or revert body change', () => {
+    const panel = fixture.debugElement.query(By.directive(AiAssistantPanelComponent)).componentInstance as AiAssistantPanelComponent;
+
+    panel.bodyChanged.emit({ body: 'Applied body from AI', source: 'apply', proposalId: 7 });
+    fixture.detectChanges();
+
+    expect(component.form.controls.body.value).toBe('Applied body from AI');
+    expect(component.initialSnapshot().body).toBe('Applied body from AI');
+    expect(component.isDirty()).toBeFalse();
+
+    panel.bodyChanged.emit({ body: MOCK_NOTE.body ?? '', source: 'revert', proposalId: 7 });
+    fixture.detectChanges();
+
+    expect(component.form.controls.body.value).toBe('## Ship it');
+    expect(component.initialSnapshot().body).toBe('## Ship it');
   });
 
   it('should extract variables from the note body using the current delimiters', () => {
