@@ -385,13 +385,13 @@ export class NoteEditorComponent implements OnInit {
     }
 
     this.restoringVersionId.set(version.id);
+    this.versionMessage.set(null);
     this.versionsError.set(null);
     this.api.restoreVersion(existingId, version.id).subscribe({
-      next: (note) => {
+      next: () => {
         this.restoringVersionId.set(null);
         this.restoreDialogVersion.set(null);
-        this.applyNoteToForm(note);
-        this.loadVersions(existingId);
+        this.reloadNoteAfterRestore(existingId, version.versionNumber);
       },
       error: () => {
         this.restoringVersionId.set(null);
@@ -490,6 +490,23 @@ export class NoteEditorComponent implements OnInit {
         this.loadingVersions.set(false);
         this.versions.set([]);
         this.versionsError.set('Failed to load versions.');
+      },
+    });
+  }
+
+  private reloadNoteAfterRestore(noteId: number, versionNumber: number): void {
+    this.loading.set(true);
+    this.loadError.set(null);
+    this.api.getNote(noteId).subscribe({
+      next: (note) => {
+        this.loading.set(false);
+        this.applyNoteToForm(note);
+        this.loadVersions(noteId);
+        this.versionMessage.set(`Note restored to version ${versionNumber}.`);
+      },
+      error: () => {
+        this.loading.set(false);
+        this.loadError.set('Failed to reload restored note.');
       },
     });
   }

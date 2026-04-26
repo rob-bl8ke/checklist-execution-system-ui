@@ -70,12 +70,12 @@
       <p
         class="rounded-xl px-4 py-3 text-sm"
         [class.border]="true"
-        [class.border-green-200]="versionMessage() === 'Version saved successfully.'"
-        [class.bg-green-50]="versionMessage() === 'Version saved successfully.'"
-        [class.text-green-700]="versionMessage() === 'Version saved successfully.'"
-        [class.border-red-200]="versionMessage() === 'Failed to save version.'"
-        [class.bg-red-50]="versionMessage() === 'Failed to save version.'"
-        [class.text-red-700]="versionMessage() === 'Failed to save version.'"
+        [class.border-green-200]="!versionMessage()?.startsWith('Failed')"
+        [class.bg-green-50]="!versionMessage()?.startsWith('Failed')"
+        [class.text-green-700]="!versionMessage()?.startsWith('Failed')"
+        [class.border-red-200]="!!versionMessage()?.startsWith('Failed')"
+        [class.bg-red-50]="!!versionMessage()?.startsWith('Failed')"
+        [class.text-red-700]="!!versionMessage()?.startsWith('Failed')"
       >
         {{ versionMessage() }}
       </p>

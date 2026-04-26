@@ -460,6 +460,11 @@ describe('NoteEditorComponent - edit mode', () => {
   });
 
   it('should confirm before restoring a version and reload the list after restore', () => {
+    api.getNote.and.returnValue(of({
+      ...MOCK_NOTE,
+      title: 'Release checklist draft',
+      body: '## Draft body',
+    }));
     api.restoreVersion.and.returnValue(of({
       ...MOCK_NOTE,
       title: 'Release checklist draft',
@@ -475,9 +480,25 @@ describe('NoteEditorComponent - edit mode', () => {
     component.restoreVersion();
 
     expect(api.restoreVersion).toHaveBeenCalledWith(3, 11);
+    expect(api.getNote).toHaveBeenCalledTimes(2);
+    expect(api.getNote.calls.mostRecent().args).toEqual([3]);
     expect(component.restoreDialogVersion()).toBeNull();
     expect(component.form.controls.title.value).toBe('Release checklist draft');
+    expect(component.versionMessage()).toBe('Note restored to version 1.');
     expect(api.getVersions).toHaveBeenCalledTimes(2);
+  });
+
+  it('should show an error and leave editor state unchanged when restore fails', () => {
+    api.restoreVersion.and.returnValue(throwError(() => new Error('restore failed')));
+
+    component.confirmRestoreVersion(MOCK_VERSIONS[1]);
+    component.restoreVersion();
+
+    expect(component.form.controls.title.value).toBe(MOCK_NOTE.title);
+    expect(component.form.controls.body.value).toBe(MOCK_NOTE.body ?? '');
+    expect(component.versionsError()).toBe('Failed to restore version.');
+    expect(component.versionMessage()).toBeNull();
+    expect(api.getNote).toHaveBeenCalledTimes(1);
   });
 
   it('should open the delete dialog and delete the note after confirmation', () => {
