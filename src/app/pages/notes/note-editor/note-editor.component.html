@@ -372,7 +372,20 @@
               </div>
 
               <div class="space-y-3">
-                <span class="block text-sm font-medium text-gray-700">Rendered Preview</span>
+                <div class="flex items-center justify-between gap-3">
+                  <span class="block text-sm font-medium text-gray-700">Rendered Preview</span>
+
+                  @if (generatedMarkdown()) {
+                    <button
+                      type="button"
+                      class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      [disabled]="generating()"
+                      (click)="copyGeneratedMarkdown()"
+                    >
+                      {{ generatedMarkdownCopied() ? 'Copied' : 'Copy' }}
+                    </button>
+                  }
+                </div>
 
                 @if (generateError()) {
                   <p class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

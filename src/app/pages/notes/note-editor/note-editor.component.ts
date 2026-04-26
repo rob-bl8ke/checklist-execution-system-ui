@@ -117,6 +117,7 @@ export class NoteEditorComponent implements OnInit {
   readonly generating = signal(false);
   readonly generateError = signal<string | null>(null);
   readonly generatedMarkdown = signal<string | null>(null);
+  readonly generatedMarkdownCopied = signal(false);
 
   readonly aiProviderOptions = AI_PROVIDER_OPTIONS;
   readonly noteId = signal<number | null>(null);
@@ -262,6 +263,7 @@ export class NoteEditorComponent implements OnInit {
       next: ({ rendered }) => {
         this.generating.set(false);
         this.generatedMarkdown.set(rendered);
+        this.generatedMarkdownCopied.set(false);
       },
       error: () => {
         this.generating.set(false);
@@ -276,6 +278,18 @@ export class NoteEditorComponent implements OnInit {
       ...snapshot,
       body: event.body,
     }));
+  }
+
+  copyGeneratedMarkdown(): void {
+    const rendered = this.generatedMarkdown();
+    if (!rendered) {
+      return;
+    }
+
+    navigator.clipboard.writeText(rendered).then(() => {
+      this.generatedMarkdownCopied.set(true);
+      window.setTimeout(() => this.generatedMarkdownCopied.set(false), 2000);
+    });
   }
 
   save(): void {

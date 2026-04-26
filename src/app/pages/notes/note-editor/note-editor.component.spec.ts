@@ -350,6 +350,30 @@ describe('NoteEditorComponent - edit mode', () => {
     expect(component.generatedMarkdown()).toBe('Deploy web to stage');
   });
 
+  it('should copy the rendered markdown output with feedback', async () => {
+    const clipboardSpy = jasmine.createSpy('writeText').and.returnValue(Promise.resolve());
+    spyOnProperty(navigator, 'clipboard', 'get').and.returnValue(
+      { writeText: clipboardSpy } as unknown as Clipboard,
+    );
+    api.generateNote.and.returnValue(of({ rendered: 'Deploy api to prod' }));
+    component.form.controls.body.setValue('Deploy {{service}} to {{environment}}');
+    component['reconcileVariableForm']();
+
+    component.generatePreview();
+    fixture.detectChanges();
+
+    const buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
+    const copyButton = buttons.find((button) => button.textContent?.trim() === 'Copy');
+    expect(copyButton).toBeDefined();
+
+    copyButton!.click();
+    await Promise.resolve();
+    fixture.detectChanges();
+
+    expect(clipboardSpy).toHaveBeenCalledWith('Deploy api to prod');
+    expect(component.generatedMarkdownCopied()).toBeTrue();
+  });
+
   it('should call updateNote when saving an existing note', () => {
     api.updateNote.and.returnValue(of({ ...MOCK_NOTE, title: 'Updated title' }));
     component.form.controls.title.setValue('Updated title');

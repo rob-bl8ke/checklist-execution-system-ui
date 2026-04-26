@@ -154,6 +154,29 @@ describe('AiAssistantPanelComponent', () => {
     expect(text).toContain('After body from AI');
   });
 
+  it('should copy assistant response messages to the clipboard with feedback', async () => {
+    const clipboardSpy = jasmine.createSpy('writeText').and.returnValue(Promise.resolve());
+    spyOnProperty(navigator, 'clipboard', 'get').and.returnValue(
+      { writeText: clipboardSpy } as unknown as Clipboard,
+    );
+    service.messages.set([
+      { id: 1, role: 'USER', content: 'User text', presetActionKey: null, createdAt: '' },
+      { id: 2, role: 'ASSISTANT', content: 'Assistant text', presetActionKey: null, createdAt: '' },
+    ]);
+    fixture.detectChanges();
+
+    const buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
+    const copyButton = buttons.find((button) => button.textContent?.trim() === 'Copy');
+    expect(copyButton).toBeDefined();
+
+    copyButton!.click();
+    await Promise.resolve();
+    fixture.detectChanges();
+
+    expect(clipboardSpy).toHaveBeenCalledWith('Assistant text');
+    expect(copyButton!.textContent?.trim()).toBe('Copied');
+  });
+
   it('should show the loading spinner during AI calls', () => {
     service.loading.set(true);
     fixture.detectChanges();

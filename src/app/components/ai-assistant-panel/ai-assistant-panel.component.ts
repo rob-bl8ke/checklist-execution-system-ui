@@ -40,6 +40,7 @@ export class AiAssistantPanelComponent implements OnInit, OnChanges {
     { key: 'suggest-tags', label: 'Suggest tags' },
   ];
   protected readonly draftMessage = signal('');
+  protected readonly copiedMessageId = signal<number | null>(null);
   protected readonly pendingProposals = computed(() =>
     this.assistant.proposals().filter((proposal) => proposal.status === 'PENDING'),
   );
@@ -149,6 +150,17 @@ export class AiAssistantPanelComponent implements OnInit, OnChanges {
     return role === 'USER'
       ? 'border-blue-200 bg-blue-50 text-blue-950'
       : 'border-gray-200 bg-white text-gray-900';
+  }
+
+  protected copyMessage(messageId: number, content: string): void {
+    navigator.clipboard.writeText(content).then(() => {
+      this.copiedMessageId.set(messageId);
+      window.setTimeout(() => {
+        if (this.copiedMessageId() === messageId) {
+          this.copiedMessageId.set(null);
+        }
+      }, 2000);
+    });
   }
 
   private hasTarget(): boolean {

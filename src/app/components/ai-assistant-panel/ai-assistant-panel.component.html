@@ -85,9 +85,21 @@
           @for (message of assistant.messages(); track message.id) {
             <article class="rounded-xl border px-4 py-3" [class]="messageRoleClass(message.role)">
               <div class="mb-2 flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.14em]">
-                <span>{{ message.role }}</span>
-                @if (message.presetActionKey) {
-                  <span>{{ message.presetActionKey }}</span>
+                <div class="flex items-center gap-3">
+                  <span>{{ message.role }}</span>
+                  @if (message.presetActionKey) {
+                    <span>{{ message.presetActionKey }}</span>
+                  }
+                </div>
+
+                @if (message.role === 'ASSISTANT') {
+                  <button
+                    type="button"
+                    class="rounded-lg border border-gray-300 bg-white px-3 py-1 text-xs font-medium normal-case tracking-normal text-gray-700 transition hover:bg-gray-100"
+                    (click)="copyMessage(message.id, message.content)"
+                  >
+                    {{ copiedMessageId() === message.id ? 'Copied' : 'Copy' }}
+                  </button>
                 }
               </div>
               <p class="whitespace-pre-wrap text-sm leading-6">{{ message.content }}</p>
