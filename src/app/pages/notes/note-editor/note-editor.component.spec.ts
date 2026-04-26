@@ -9,7 +9,7 @@ import { AiAssistantPanelComponent } from '../../../components/ai-assistant-pane
 import { NoteEditorComponent } from './note-editor.component';
 import { NotesApiService } from '../../../services/notes-api.service';
 import { AiAssistantService } from '../../../services/ai-assistant.service';
-import { Note } from '../../../models/api.models';
+import { Note, NoteVersion } from '../../../models/api.models';
 
 const MOCK_NOTE: Note = {
   id: 3,
@@ -28,6 +28,33 @@ const MOCK_NOTE: Note = {
     { id: 2, noteId: 3, tag: 'release' },
   ],
 };
+
+const MOCK_VERSIONS: NoteVersion[] = [
+  {
+    id: 12,
+    noteId: 3,
+    title: 'Release checklist',
+    body: '## Ship it',
+    versionNumber: 2,
+    createdAt: '2026-04-02T00:00:00.000Z',
+  },
+  {
+    id: 11,
+    noteId: 3,
+    title: 'Release checklist draft',
+    body: '## Draft body',
+    versionNumber: 1,
+    createdAt: '2026-04-01T00:00:00.000Z',
+  },
+  {
+    id: 13,
+    noteId: 3,
+    title: 'Release checklist updated',
+    body: '## Updated body',
+    versionNumber: 3,
+    createdAt: '2026-04-03T00:00:00.000Z',
+  },
+];
 
 function makeRoute(id: string | null) {
   return {
@@ -77,6 +104,8 @@ describe('NoteEditorComponent - create mode', () => {
       'updateNote',
       'generateNote',
       'createVersion',
+      'getVersions',
+      'restoreVersion',
       'deleteNote',
     ]);
     router = jasmine.createSpyObj('Router', ['navigate']);
@@ -235,12 +264,15 @@ describe('NoteEditorComponent - edit mode', () => {
       'updateNote',
       'generateNote',
       'createVersion',
+      'getVersions',
+      'restoreVersion',
       'deleteNote',
     ]);
     router = jasmine.createSpyObj('Router', ['navigate']);
     assistant = createAiAssistantServiceSpy();
     api.getTags.and.returnValue(of(['ops', 'release', 'research']));
     api.getNote.and.returnValue(of(MOCK_NOTE));
+    api.getVersions.and.returnValue(of([MOCK_VERSIONS[0], MOCK_VERSIONS[1], MOCK_VERSIONS[2]]));
 
     await TestBed.configureTestingModule({
       imports: [NoteEditorComponent],
@@ -270,6 +302,13 @@ describe('NoteEditorComponent - edit mode', () => {
     expect(fixture.nativeElement.querySelector('app-ai-assistant-panel')).not.toBeNull();
     expect(assistant.loadProviderStatus).toHaveBeenCalled();
     expect(assistant.loadSession).toHaveBeenCalledWith('NOTE', 3);
+  });
+
+  it('should load versions newest first and mark the current saved state', () => {
+    expect(api.getVersions).toHaveBeenCalledWith(3);
+    expect(component.sortedVersions().map((version) => version.versionNumber)).toEqual([3, 2, 1]);
+    expect(component.currentSavedVersionId()).toBe(12);
+    expect(fixture.nativeElement.textContent).toContain('Current');
   });
 
   it('should hide the AI assistant panel when AI is disabled', () => {
@@ -417,6 +456,28 @@ describe('NoteEditorComponent - edit mode', () => {
 
     expect(api.createVersion).toHaveBeenCalledWith(3);
     expect(component.versionMessage()).toBe('Version saved successfully.');
+    expect(api.getVersions).toHaveBeenCalledTimes(2);
+  });
+
+  it('should confirm before restoring a version and reload the list after restore', () => {
+    api.restoreVersion.and.returnValue(of({
+      ...MOCK_NOTE,
+      title: 'Release checklist draft',
+      body: '## Draft body',
+    }));
+
+    component.confirmRestoreVersion(MOCK_VERSIONS[1]);
+    fixture.detectChanges();
+
+    expect(api.restoreVersion).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.querySelector('app-confirm-dialog')).not.toBeNull();
+
+    component.restoreVersion();
+
+    expect(api.restoreVersion).toHaveBeenCalledWith(3, 11);
+    expect(component.restoreDialogVersion()).toBeNull();
+    expect(component.form.controls.title.value).toBe('Release checklist draft');
+    expect(api.getVersions).toHaveBeenCalledTimes(2);
   });
 
   it('should open the delete dialog and delete the note after confirmation', () => {
@@ -454,12 +515,15 @@ describe('NoteEditorComponent - loading signal', () => {
       'updateNote',
       'generateNote',
       'createVersion',
+      'getVersions',
+      'restoreVersion',
       'deleteNote',
     ]);
     router = jasmine.createSpyObj('Router', ['navigate']);
     assistant = createAiAssistantServiceSpy();
     api.getTags.and.returnValue(of(['ops', 'release', 'research']));
     api.getNote.and.returnValue(noteSubject.asObservable());
+    api.getVersions.and.returnValue(of([]));
 
     await TestBed.configureTestingModule({
       imports: [NoteEditorComponent],
@@ -484,6 +548,7 @@ describe('NoteEditorComponent - loading signal', () => {
     noteSubject.complete();
 
     expect(component.loading()).toBeFalse();
+    expect(api.getVersions).toHaveBeenCalledWith(3);
   });
 });
 
@@ -502,6 +567,8 @@ describe('NoteEditorComponent - invalid edit route', () => {
       'updateNote',
       'generateNote',
       'createVersion',
+      'getVersions',
+      'restoreVersion',
       'deleteNote',
     ]);
     router = jasmine.createSpyObj('Router', ['navigate']);

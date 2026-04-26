@@ -24,7 +24,7 @@ import { map, startWith } from 'rxjs';
 import { AiAssistantPanelComponent } from '../../../components/ai-assistant-panel/ai-assistant-panel.component';
 import { ConfirmDialogComponent } from '../../../components/confirm-dialog/confirm-dialog.component';
 import { LoadingSpinnerComponent } from '../../../components/loading-spinner/loading-spinner.component';
-import { AiProviderKey, Note } from '../../../models/api.models';
+import { AiProviderKey, Note, NoteVersion } from '../../../models/api.models';
 import { extractVariables } from '../../runs/start-run/start-run.component';
 import { NotesApiService } from '../../../services/notes-api.service';
 
@@ -112,6 +112,11 @@ export class NoteEditorComponent implements OnInit {
   readonly loadError = signal<string | null>(null);
   readonly saveError = signal<string | null>(null);
   readonly versionMessage = signal<string | null>(null);
+  readonly versions = signal<NoteVersion[]>([]);
+  readonly loadingVersions = signal(false);
+  readonly versionsError = signal<string | null>(null);
+  readonly restoreDialogVersion = signal<NoteVersion | null>(null);
+  readonly restoringVersionId = signal<number | null>(null);
   readonly deleteError = signal<string | null>(null);
   readonly deleteDialogOpen = signal(false);
   readonly generating = signal(false);
@@ -164,6 +169,18 @@ export class NoteEditorComponent implements OnInit {
     () => !this.isCreateMode() && this.noteId() !== null && this.formRawValue().aiEnabled,
   );
   readonly hasGeneratePanel = computed(() => !this.isCreateMode() && this.variableNames().length > 0);
+  readonly sortedVersions = computed(() =>
+    [...this.versions()].sort((left, right) =>
+      right.versionNumber - left.versionNumber || right.createdAt.localeCompare(left.createdAt),
+    ),
+  );
+  readonly currentSavedVersionId = computed(() => {
+    const snapshot = this.initialSnapshot();
+
+    return this.sortedVersions().find((version) =>
+      version.title === snapshot.title && (version.body ?? '') === snapshot.body,
+    )?.id ?? null;
+  });
 
   ngOnInit(): void {
     const rawId = this.route.snapshot.paramMap.get('id');
@@ -339,10 +356,47 @@ export class NoteEditorComponent implements OnInit {
       next: () => {
         this.savingVersion.set(false);
         this.versionMessage.set('Version saved successfully.');
+        this.loadVersions(existingId);
       },
       error: () => {
         this.savingVersion.set(false);
         this.versionMessage.set('Failed to save version.');
+      },
+    });
+  }
+
+  confirmRestoreVersion(version: NoteVersion): void {
+    this.restoreDialogVersion.set(version);
+  }
+
+  cancelRestoreVersion(): void {
+    if (this.restoringVersionId() !== null) {
+      return;
+    }
+
+    this.restoreDialogVersion.set(null);
+  }
+
+  restoreVersion(): void {
+    const existingId = this.noteId();
+    const version = this.restoreDialogVersion();
+    if (existingId === null || !version) {
+      return;
+    }
+
+    this.restoringVersionId.set(version.id);
+    this.versionsError.set(null);
+    this.api.restoreVersion(existingId, version.id).subscribe({
+      next: (note) => {
+        this.restoringVersionId.set(null);
+        this.restoreDialogVersion.set(null);
+        this.applyNoteToForm(note);
+        this.loadVersions(existingId);
+      },
+      error: () => {
+        this.restoringVersionId.set(null);
+        this.restoreDialogVersion.set(null);
+        this.versionsError.set('Failed to restore version.');
       },
     });
   }
@@ -394,6 +448,14 @@ export class NoteEditorComponent implements OnInit {
     return !!this.form.errors?.['delimiterPair'] && (this.form.touched || this.submitted());
   }
 
+  formatVersionTimestamp(createdAt: string): string {
+    return new Date(createdAt).toLocaleString();
+  }
+
+  restoreDialogMessage(version: NoteVersion): string {
+    return `Restore version ${version.versionNumber} from ${this.formatVersionTimestamp(version.createdAt)}? The current note state will be snapshotted automatically.`;
+  }
+
   private loadNote(id: number): void {
     this.loading.set(true);
     this.loadError.set(null);
@@ -401,6 +463,7 @@ export class NoteEditorComponent implements OnInit {
       next: (note) => {
         this.loading.set(false);
         this.applyNoteToForm(note);
+        this.loadVersions(id);
       },
       error: () => {
         this.loading.set(false);
@@ -412,6 +475,22 @@ export class NoteEditorComponent implements OnInit {
   private loadTags(): void {
     this.api.getTags().subscribe({
       next: (tags) => this.availableTags.set(tags),
+    });
+  }
+
+  private loadVersions(noteId: number): void {
+    this.loadingVersions.set(true);
+    this.versionsError.set(null);
+    this.api.getVersions(noteId).subscribe({
+      next: (versions) => {
+        this.loadingVersions.set(false);
+        this.versions.set(versions);
+      },
+      error: () => {
+        this.loadingVersions.set(false);
+        this.versions.set([]);
+        this.versionsError.set('Failed to load versions.');
+      },
     });
   }
 
