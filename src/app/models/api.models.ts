@@ -132,6 +132,18 @@ export interface UpdateTodoDto {
   completed?: boolean;
 }
 
+export interface TodoFilters {
+  search: string;
+  status: 'incomplete' | 'completed' | 'all';
+  priority: TodoPriority[];
+  dueDateFrom: string | null;
+  dueDateTo: string | null;
+  overdueOnly: boolean;
+  sortField: 'dueDate' | 'priority' | 'createdAt' | 'title';
+  sortDir: 'asc' | 'desc';
+  page: number;
+}
+
 // ---------------------------------------------------------------------------
 // Reminders
 // ---------------------------------------------------------------------------
